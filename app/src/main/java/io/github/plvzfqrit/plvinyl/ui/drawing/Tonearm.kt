@@ -1,6 +1,7 @@
 package io.github.plvzfqrit.plvinyl.ui.drawing
 
 import androidx.compose.foundation.Canvas
+import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -136,39 +137,17 @@ object TonearmGeometry {
 }
 
 /**
- * How the tonearm sits relative to the platter on the real turntable,
- * measured from the same photo (same reference units as TonearmGeometry).
+ * How the tonearm sits relative to the platter on the real turntable. The numbers
+ * live in the core ([ArmGeometry]); this adds the Compose types the drawing needs.
  *
  * The tonearm must NOT be sized/placed independently of the platter. Derive
  * both from the platter: scale = platterRadiusPx / PLATTER_RADIUS, and
  * pivot = spindle + PIVOT_FROM_SPINDLE * scale.
  */
 object TurntableGeometry {
-    /** Outer radius of the platter (silver rim) in reference units. */
-    const val PLATTER_RADIUS = 205f
-
-    /** Tonearm pivot (center of the round base), measured from the spindle. */
-    val PIVOT_FROM_SPINDLE = Offset(182f, -169f)
-
-    /** Arm parked in its rest clip. Use this whenever nothing is playing. */
-    const val REST_DEG = 0f
-
-    /*
-     * Needle angles matched to the record's actual groove band (see VinylRecord.kt):
-     * music runs from the outer edge of the grooves (record radius 0.955) to their
-     * inner edge (0.605). Past that is the dead wax and the label — the needle
-     * never plays there; at the end of the song the arm lifts instead.
-     */
-
-    /** Needle at the start of the music (outer edge of the groove band). */
-    const val LEAD_IN_DEG = 9.2f
-
-    /** Needle at the end of the music (inner edge of the groove band, before the dead wax). */
-    const val RUN_OUT_DEG = 25.7f
-
-    /** Map track progress 0..1 to the arm angle while playing. */
-    fun playingAngle(progress: Float): Float =
-        LEAD_IN_DEG + (RUN_OUT_DEG - LEAD_IN_DEG) * progress.coerceIn(0f, 1f)
+    const val PLATTER_RADIUS = ArmGeometry.PLATTER_RADIUS
+    val PIVOT_FROM_SPINDLE = Offset(ArmGeometry.PIVOT_FROM_SPINDLE_X, ArmGeometry.PIVOT_FROM_SPINDLE_Y)
+    const val REST_DEG = ArmGeometry.REST_DEG
 }
 
 /**
