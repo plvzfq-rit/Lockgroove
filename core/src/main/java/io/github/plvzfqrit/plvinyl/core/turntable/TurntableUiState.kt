@@ -16,6 +16,8 @@ data class TurntableUiState(
     val grabAngle: Float? = null,
     /** Flicking through songs (the arm waits parked). */
     val browsing: Boolean = false,
+    /** The needle is circling the locked groove after the music ended. */
+    val inLeadOut: Boolean = false,
     /** ↻1 is on (the key's light). */
     val repeatOne: Boolean = false,
 )

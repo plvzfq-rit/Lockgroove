@@ -7,6 +7,7 @@ import io.github.plvzfqrit.plvinyl.core.model.RecordSize
 import io.github.plvzfqrit.plvinyl.core.model.RecordSizeChoice
 import io.github.plvzfqrit.plvinyl.core.model.SongKey
 import io.github.plvzfqrit.plvinyl.core.model.sizeFor
+import io.github.plvzfqrit.plvinyl.core.playback.CrossfadeLearner
 import io.github.plvzfqrit.plvinyl.core.playback.PlaybackArbiter
 import io.github.plvzfqrit.plvinyl.core.playback.PlayerCommand
 import io.github.plvzfqrit.plvinyl.core.playback.PlayerSnapshot
@@ -30,6 +31,8 @@ class TurntableController(
 ) {
     private val arbiter = PlaybackArbiter(clock)
     private val skips = SkipQueue()
+    private val end = EndOfRecord()
+    private val crossfade = CrossfadeLearner()
 
     private val _target = MutableStateFlow(TurntableTarget())
 
@@ -42,6 +45,9 @@ class TurntableController(
     /** The app's own repeat one (the ↻1 key). */
     var repeatOne = false
         set(value) { field = value; refresh() }
+
+    /** How long before the end the needle lifts (margin against auto-advance). */
+    var endMarginMs = 1000L
 
     /** 7" or 12", from the song length (a setting). */
     var recordSizeChoice: RecordSizeChoice = RecordSizeChoice.Auto
@@ -70,6 +76,10 @@ class TurntableController(
     /** STOP sends the arm home; a pause from the cue lever (or the player) just hovers it. */
     private var parkWhenPaused = false
 
+    /** A cue jump (repeat): the player jumps to [ms] once the needle is up. */
+    private data class CueJump(val ms: Long, val since: Long)
+    private var cueJump: CueJump? = null
+
     // ---- Opening and coming back
     private sealed interface Phase {
         data object Stopped : Phase
@@ -87,6 +97,12 @@ class TurntableController(
     fun onSnapshot(s: PlayerSnapshot?) {
         val prev = song
         if (prev != null && s != null && PositionTracker.isSeek(prev, s)) seekId++
+        // The song changed by itself while the needle was on it, a few seconds early:
+        // the player's crossfade. Lift that much sooner next time.
+        if (prev != null && s != null) {
+            crossfade.observe(prev, s, needleWasOnPrev = needleOn == prev.key,
+                flicking = skips.browsing || skips.queued != 0, now = clock.nowMs())
+        }
         if (s?.key != prev?.key) playedMs = 0L
         song = s
         refresh()
@@ -152,6 +168,7 @@ class TurntableController(
         if (move is Move.Lift && deck.needleOn != null) {
             this.deck = deck.copy(needleOn = null)
             sendAll(arbiter.onNeedleUp())
+            sendCueJump()                                    // the player jumps while the needle is up
         }
         refresh()
     }
@@ -174,6 +191,8 @@ class TurntableController(
             is Phase.StartingUp -> if (song != null || now >= p.deadline) snapToPlayer()
             is Phase.Resuming -> if (now >= p.at) {
                 skips.reset()
+                end.reset()
+                cueJump = null
                 grabAngle = null
                 dropAngle = null
                 parkWhenPaused = false
@@ -183,6 +202,23 @@ class TurntableController(
         }
         if (phase == Phase.Running) {
             val s = song
+            val ending = end.tick(
+                now, s, needleOn, audible(), browsing = skips.browsing, wantPlaying = arbiter.wantPlaying,
+                grabbing = grabAngle != null, leadMs = endMarginMs + (s?.let { crossfade.leadFor(it.player) } ?: 0L),
+                repeatOne = repeatOne,
+            )
+            when (ending) {
+                EndEffect.EnterLeadOut -> sendAll(arbiter.enterLeadOut())
+                EndEffect.LeadOutCancelled -> arbiter.leaveLeadOut()
+                is EndEffect.Repeat -> jumpTo(0L)
+                is EndEffect.NextRecord -> skips.runOut(ending.key, now)
+                null -> {}
+            }
+            // Cue jump: sent as the needle lifts (onMoveStarted); this is the fallback
+            // for a needle that's already up, or a lift that never came.
+            cueJump?.let { jump ->
+                if (needleOn == null || now - jump.since >= CUE_JUMP_TIMEOUT_MS) sendCueJump()
+            }
             val effects = skips.tick(
                 now, needleUp = needleOn == null, key = s?.key,
                 positionMs = s?.let { PositionTracker.positionAt(it, now) }, settledKey = settled?.key,
@@ -211,6 +247,23 @@ class TurntableController(
         val disc = settled
         deck = if (disc != null && playing) Deck(disc, playAngle(clock.nowMs()), armUp = false, needleOn = disc.key)
         else Deck(disc)
+    }
+
+    /** Lift, swing to [ms] into the song, drop: the player jumps while the needle is up. */
+    private fun jumpTo(ms: Long) {
+        val s = song
+        val p = if (s != null && s.durationMs > 0L) ms.toFloat() / s.durationMs else 0f
+        dropAngle = (settled?.size ?: RecordSize.LP).playingAngle(p)
+        dropUntil = clock.nowMs() + DROP_HOLD_MS
+        seekId++                                             // re-cue: lift, move, drop
+        cueJump = CueJump(ms, clock.nowMs())
+    }
+
+    private fun sendCueJump() {
+        val jump = cueJump ?: return
+        cueJump = null
+        send(PlayerCommand.SeekTo(jump.ms))
+        playedMs = jump.ms
     }
 
     private fun letGoOfArm() {
@@ -265,7 +318,7 @@ class TurntableController(
         if (phase == Phase.Running) {
             settle(now)
             sendAll(arbiter.onPlayer(s?.sounding == true, s?.key, touching = s != null && needleOn == s.key,
-                needleDown = needleOn != null))
+                needleDown = needleOn != null, naturalHandOff = end.isNaturalHandOff(needleOn, now)))
             _target.value = TurntableTarget(
                 disc = settled,
                 playing = arbiter.wantPlaying,
@@ -286,6 +339,7 @@ class TurntableController(
             audible = audible(),
             canGrab = settled != null && !skips.browsing,
             browsing = skips.browsing,
+            inLeadOut = end.inLeadOut,
             grabAngle = grabAngle,
             repeatOne = repeatOne,
         )
@@ -295,7 +349,9 @@ class TurntableController(
     private fun playAngle(now: Long): Float {
         val progress = song?.let { PositionTracker.progress(it, now) }
             ?: (playedMs.toFloat() / NOMINAL_TRACK_MS).coerceIn(0f, 1f)
-        return dropAngle ?: (settled?.size ?: RecordSize.LP).playingAngle(progress)
+        val size = settled?.size ?: RecordSize.LP
+        if (end.inLeadOut) return size.lockedGrooveDeg
+        return dropAngle ?: size.playingAngle(progress)
     }
 
     private fun sendAll(commands: List<PlayerCommand>) = commands.forEach(send)
@@ -309,6 +365,8 @@ class TurntableController(
         const val ART_WAIT_MS = 1200L
         /** After dropping the needle by hand, hold it there this long while the player catches up. */
         const val DROP_HOLD_MS = 1500L
+        /** A cue jump waits at most this long for the needle to lift. */
+        const val CUE_JUMP_TIMEOUT_MS = 2000L
         /** Used to creep the needle inward when the player doesn't report a length. */
         const val NOMINAL_TRACK_MS = 4 * 60 * 1000L
     }
