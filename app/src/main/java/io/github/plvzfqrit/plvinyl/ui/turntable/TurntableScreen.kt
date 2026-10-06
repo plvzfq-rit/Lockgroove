@@ -12,6 +12,9 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -60,6 +63,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawPlatterFelt
+import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmColors
@@ -264,11 +268,14 @@ fun TurntableScreen(
                 )
             }
 
-            // Title and artist sit on the top plate, under the record.
+            val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val panelHeight = FRONT_PANEL_HEIGHT + navInset
+
+            // Title and artist sit on the top plate, between the record and the front edge.
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = platterTop + platterSize + 16.dp)
+                    .padding(top = platterTop + platterSize + 16.dp, bottom = panelHeight)
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 // Title/artist fade to the new song. Long ones scroll (marquee).
@@ -281,6 +288,24 @@ fun TurntableScreen(
                     }
                 }
             }
+
+            // The controls live on the FRONT of the plinth:
+            // |◀◀ previous · ▶■ start/stop (stop sends the arm home) · ▲▼ cue (pause in
+            // place, needle hovers) · ↻1 repeat one · ▶▶| next.
+            val panelPalette = remember(art) { art?.let(::extractVinylPalette) }
+            FrontPanel(
+                style = backdrop,
+                albumPalette = panelPalette,
+                playing = ui.playing,
+                repeatOne = ui.repeatOne,
+                night = { 0f },
+                onStartStop = { vm.onIntent(UserIntent.StartStop) },
+                onCue = { vm.onIntent(UserIntent.Cue) },
+                onRepeat = { vm.onIntent(UserIntent.ToggleRepeat) },
+                onPrevious = {},
+                onNext = {},
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }
