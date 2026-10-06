@@ -1,5 +1,6 @@
 package io.github.plvzfqrit.plvinyl.ui.turntable
 
+import android.app.Activity
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
@@ -28,11 +29,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -57,17 +62,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
+import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
+import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.UserIntent
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
-import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawPlatterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
@@ -75,6 +82,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
+import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -87,13 +95,15 @@ import kotlin.math.abs
  */
 @Composable
 fun TurntableScreen(
-    backdrop: BackdropStyle,
-    finish: VinylFinish,
     modifier: Modifier = Modifier,
     vm: TurntableViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val arts by vm.art.collectAsStateWithLifecycle()
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val look by vm.look.collectAsStateWithLifecycle()
+    val backdrop = look.backdrop
+    var showSettings by remember { mutableStateOf(false) }
     val animator = remember { TurntableAnimator() }
     val haptics = LocalHapticFeedback.current
     val view = LocalView.current
@@ -121,6 +131,14 @@ fun TurntableScreen(
     // The record physically on the platter (during a swap, still the old one).
     val disc = animator.disc
     val art = disc?.let { arts[it.key] }
+
+    PhoneSettingsEffects(settings, backdrop, audible = ui.audible)
+    SideEffect {
+        // Singles turn at 45, i.e. 1.35× faster.
+        animator.spinDegPerSec = settings.spin.degPerSec * (disc?.size?.spinFactor ?: 1f)
+        // How often the record is redrawn (the biggest battery cost).
+        animator.frameIntervalMs = settings.motion.fps.let { if (it == 0) 0L else 1000L / it }
+    }
 
     Box(modifier.fillMaxSize()) {
         TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value)
@@ -159,7 +177,8 @@ fun TurntableScreen(
                 if (disc != null) {
                     VinylRecord(
                         art = art,
-                        finish = finish,
+                        finish = look.finish,
+                        grooveGlints = settings.grooveGlints,
                         seedKey = disc.key.value,
                         rotation = { animator.spinAngle },
                         size = disc.size,
@@ -308,6 +327,16 @@ fun TurntableScreen(
                 )
             }
 
+            // Settings: a knob under the tonearm, on the platter's baseline.
+            val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
+            val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
+            val settingsCenterX = minOf(pivotX + unit * 40f, maxWidth - 12.dp - 27.dp)
+            SettingsKnob(
+                onClick = { showSettings = true },
+                // 54 dp square (42 dp knob + 6 dp margin): its bottom sits on the platter's baseline.
+                modifier = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp),
+            )
+
             val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val panelHeight = FRONT_PANEL_HEIGHT + navInset
 
@@ -346,7 +375,53 @@ fun TurntableScreen(
                 onNext = { vm.onIntent(UserIntent.Flick(+1)) },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+
+            if (showSettings) {
+                SettingsSheet(
+                    current = backdrop,
+                    finish = look.finish,
+                    art = art,
+                    seedKey = disc?.key?.value,
+                    settings = settings,
+                    learnedCrossfadeMs = ui.learnedCrossfadeMs,
+                    onSelect = { vm.setLook(look.copy(backdrop = it)) },
+                    onSelectFinish = { vm.setLook(look.copy(finish = it)) },
+                    onSettings = { new -> vm.updateSettings { new } },
+                    onResetCrossfade = { ui.player?.let(vm::forgetCrossfade) },
+                    onDismiss = { showSettings = false },
+                )
+            }
         }
+    }
+}
+
+/** The settings that act on the phone itself rather than the turntable. */
+@Composable
+private fun PhoneSettingsEffects(settings: Settings, backdrop: BackdropStyle, audible: Boolean) {
+    val view = LocalView.current
+    // Keep the screen awake while the record is playing (like a video app does).
+    DisposableEffect(view, audible, settings.keepScreenOn) {
+        view.keepScreenOn = audible && settings.keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
+    // Haptics on/off for the whole screen (every click and tick goes through this view).
+    SideEffect { view.isHapticFeedbackEnabled = settings.haptics }
+    if (view.isInEditMode) return
+    val window = (view.context as Activity).window
+    // Dark status-bar icons on the light Paper background, light icons otherwise.
+    SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = backdrop.isLight }
+    // Battery / Balanced motion: ask the display for a 60 Hz mode (same resolution).
+    // Smooth = no preference, so 90/120 Hz phones run at their full rate.
+    LaunchedEffect(settings.motion) {
+        val display = view.display ?: return@LaunchedEffect
+        val current = display.mode
+        val modeId = if (settings.motion != MotionQuality.Smooth) {
+            display.supportedModes
+                .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+                .minByOrNull { abs(it.refreshRate - 60f) }
+                ?.modeId ?: 0
+        } else 0
+        window.attributes = window.attributes.apply { preferredDisplayModeId = modeId }
     }
 }
 
