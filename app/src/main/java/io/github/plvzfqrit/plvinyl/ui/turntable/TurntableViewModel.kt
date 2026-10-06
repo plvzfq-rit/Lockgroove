@@ -10,6 +10,8 @@ import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.TurntableController
 import io.github.plvzfqrit.plvinyl.core.turntable.UserIntent
 import io.github.plvzfqrit.plvinyl.data.Look
+import io.github.plvzfqrit.plvinyl.data.PlayLogStore
+import io.github.plvzfqrit.plvinyl.data.Plays
 import io.github.plvzfqrit.plvinyl.data.SettingsStore
 import io.github.plvzfqrit.plvinyl.media.MediaSessionWatcher
 import kotlinx.coroutines.Job
@@ -27,8 +29,11 @@ import kotlinx.coroutines.launch
  * reports, ticks it while the app is on screen, and saves the settings.
  */
 class TurntableViewModel(app: Application) : AndroidViewModel(app) {
-    private val controller = TurntableController(AndroidClock) { MediaSessionWatcher.send(it) }
+    private val controller = TurntableController(AndroidClock, MediaSessionWatcher::send, Plays.counter(app))
     private val store = SettingsStore(app)
+
+    /** The play log (stats and record wear). */
+    val history = PlayLogStore.get(app)
 
     val ui = controller.ui
     val target = controller.target
@@ -49,6 +54,7 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onStart() {
+        Plays.appOnScreen = true
         controller.onStart()
         ticker?.cancel()
         ticker = viewModelScope.launch {
@@ -63,6 +69,9 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
         ticker?.cancel()
         ticker = null
         controller.onStop()
+        Plays.appOnScreen = false
+        // Hand over to the background counter right away, with the player's current state.
+        MediaSessionWatcher.refresh(getApplication())
     }
 
     fun onIntent(intent: UserIntent) = controller.onIntent(intent)
