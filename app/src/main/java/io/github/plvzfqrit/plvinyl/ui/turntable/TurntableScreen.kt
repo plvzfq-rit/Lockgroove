@@ -2,6 +2,8 @@ package io.github.plvzfqrit.plvinyl.ui.turntable
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -29,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,8 +48,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -69,6 +76,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * The turntable. The controller (in the view model) decides; the animator performs
@@ -105,6 +113,10 @@ fun TurntableScreen(
             },
         )
     }
+
+    val scope = rememberCoroutineScope()
+    // Swiping nudges the record on the felt.
+    val swipeNudge = remember { Animatable(0f) }
 
     // The record physically on the platter (during a swap, still the old one).
     val disc = animator.disc
@@ -170,6 +182,7 @@ fun TurntableScreen(
                                     translationX = 0.08f * size.width * -tr
                                     translationY = -1.15f * size.height * -tr
                                 }
+                                translationX += swipeNudge.value
                                 alpha = animator.recordAlpha.value
                                 shadowElevation = (1f + 22f * h.coerceAtLeast(0f)).dp.toPx()
                                 // The shadow follows the RECORD, not the platter-sized layer.
@@ -183,10 +196,18 @@ fun TurntableScreen(
             // Tonearm arm, above the record. Grab the arm or headshell and drag: the
             // needle lifts (music pauses), and where you let go is where it drops and
             // plays from. Let go off the record and it goes back to rest.
+            // Swipe the record itself to change songs: ← next, → previous.
             val latestUi by rememberUpdatedState(ui)
             Canvas(
                 Modifier
                     .fillMaxSize()
+                    // Screen readers can't drag or swipe: offer song changes as actions.
+                    .semantics {
+                        customActions = listOf(
+                            CustomAccessibilityAction("Next song") { vm.onIntent(UserIntent.Flick(+1)); true },
+                            CustomAccessibilityAction("Previous song") { vm.onIntent(UserIntent.Flick(-1)); true },
+                        )
+                    }
                     .pointerInput(spindleX, spindleY, platterRadius) {
                         fun geometry() = tonearmPlacementFor(Offset(spindleX.toPx(), spindleY.toPx()), platterRadius.toPx())
                         fun sizeNow() = animator.disc?.size ?: RecordSize.LP
@@ -198,9 +219,28 @@ fun TurntableScreen(
                                 down.position.x, down.position.y, pivot.x, pivot.y, unit,
                                 animator.armAngle.value, 14.dp.toPx(),
                             )
-                            if (!onArm) return@awaitEachGesture
+                            val spindle = Offset(spindleX.toPx(), spindleY.toPx())
+                            val recordR = platterRadius.toPx() * sizeNow().radiusOfPlatter
+                            val onRecord = !onArm && animator.disc != null && (down.position - spindle).getDistance() <= recordR
+                            if (!onArm && !onRecord) return@awaitEachGesture
                             val start = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
                                 ?: return@awaitEachGesture
+
+                            if (onRecord) {
+                                var swipeDx = start.position.x - down.position.x
+                                val max = 48.dp.toPx()
+                                drag(start.id) { change ->
+                                    swipeDx += change.positionChange().x
+                                    scope.launch { swipeNudge.snapTo((swipeDx * 0.35f).coerceIn(-max, max)) }
+                                    change.consume()
+                                }
+                                if (abs(swipeDx) > SWIPE_SKIP_DISTANCE.toPx()) {
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    vm.onIntent(UserIntent.Flick(if (swipeDx < 0f) +1 else -1))
+                                }
+                                scope.launch { swipeNudge.animateTo(0f, spring(dampingRatio = 0.6f)) }
+                                return@awaitEachGesture
+                            }
 
                             val startPointer = ArmGeometry.pointerDeg(down.position.x, down.position.y, pivot.x, pivot.y)
                             val startArm = animator.armAngle.value
@@ -302,13 +342,16 @@ fun TurntableScreen(
                 onStartStop = { vm.onIntent(UserIntent.StartStop) },
                 onCue = { vm.onIntent(UserIntent.Cue) },
                 onRepeat = { vm.onIntent(UserIntent.ToggleRepeat) },
-                onPrevious = {},
-                onNext = {},
+                onPrevious = { vm.onIntent(UserIntent.Flick(-1)) },
+                onNext = { vm.onIntent(UserIntent.Flick(+1)) },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
 }
+
+/** Swipe the record at least this far to change songs. */
+private val SWIPE_SKIP_DISTANCE = 72.dp
 
 /** m:ss */
 private fun formatTime(ms: Long): String {
