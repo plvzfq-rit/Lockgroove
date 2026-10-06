@@ -136,7 +136,23 @@ class TurntableAnimator {
                 continue
             }
             onStarted(move, deck)
-            perform(move)
+            if (move is Move.Track) {
+                // The groove glide is slow (up to 2 s): let a pause, a grab or a song
+                // change cut it short instead of waiting for it to finish.
+                coroutineScope {
+                    val glide = launch { perform(move) }
+                    val watch = launch {
+                        target.first { t ->
+                            MovePlanner.interrupts(move, deck, t, seeked = t.seekId != lastSeekId, snap = t.snapId != lastSnapId)
+                        }
+                        glide.cancel()
+                    }
+                    glide.join()
+                    watch.cancel()
+                }
+            } else {
+                perform(move)
+            }
             onFinished(move, deck)
         }
     }
@@ -147,7 +163,7 @@ class TurntableAnimator {
         when (move) {
             is Move.Lift -> {
                 needleOn = null
-                armLift.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+                armLift.animateTo(1f, tween(if (move.byHand) 150 else 350, easing = FastOutSlowInEasing))
             }
             // Cue lever descent: slow and damped, no bounce.
             Move.Lower -> armLift.animateTo(0f, tween(550, easing = LinearOutSlowInEasing))

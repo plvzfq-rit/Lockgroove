@@ -6,6 +6,7 @@ import io.github.plvzfqrit.plvinyl.core.model.RecordSize
 import io.github.plvzfqrit.plvinyl.core.model.SongKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -126,7 +127,7 @@ class MovePlannerTest {
     @Test fun `a finger on the arm lifts the needle, then the arm follows the finger`() {
         val start = playingOn(a, lp.playingAngle(0.5f))
         val target = TurntableTarget(a, playing = true, grabAngle = 20f)
-        assertEquals(Move.Lift("picked up by hand"), MovePlanner.next(start, target))
+        assertEquals(Move.Lift("picked up by hand", byHand = true), MovePlanner.next(start, target))
         assertEquals(Move.FollowHand(20f), MovePlanner.next(start.copy(armUp = true, needleOn = null), target))
     }
 
@@ -138,5 +139,37 @@ class MovePlannerTest {
     @Test fun `opening mid-song snaps straight to the needle in the groove`() {
         val m = MovePlanner.next(Deck(null), TurntableTarget(a, playing = true, playAngle = 15f), snap = true)
         assertEquals(Move.SnapTo(Deck(a, armDeg = 15f, armUp = false, needleOn = a.key)), m)
+    }
+
+    // ---- Cutting a glide short
+
+    /** Halfway through gliding from 15.0° to 15.3°. */
+    private val gliding = playingOn(a, 15.15f)
+    private val glide = Move.Track(15.3f)
+
+    @Test fun `pausing mid-glide lifts the arm at once`() {
+        assertTrue(MovePlanner.interrupts(glide, gliding, TurntableTarget(a, playing = false)))
+    }
+
+    @Test fun `grabbing the arm mid-glide lifts it at once`() {
+        assertTrue(MovePlanner.interrupts(glide, gliding, TurntableTarget(a, playing = true, playAngle = 15.3f, grabAngle = 15.15f)))
+    }
+
+    @Test fun `a song change mid-glide lifts the arm at once`() {
+        assertTrue(MovePlanner.interrupts(glide, gliding, TurntableTarget(b, playing = true, playAngle = lp.leadInDeg)))
+    }
+
+    @Test fun `the needle creeping on doesn't cut the glide short`() {
+        assertFalse(MovePlanner.interrupts(glide, gliding, TurntableTarget(a, playing = true, playAngle = 15.4f)))
+    }
+
+    @Test fun `the lead-out glide takes over at once`() {
+        assertTrue(MovePlanner.interrupts(glide, gliding, TurntableTarget(a, playing = true, playAngle = lp.lockedGrooveDeg)))
+    }
+
+    @Test fun `swings and lifts are never cut short`() {
+        val raised = Deck(a, armDeg = 12f, armUp = true)
+        assertFalse(MovePlanner.interrupts(Move.Swing(20f), raised, TurntableTarget(a, playing = false, parkWhenPaused = true)))
+        assertFalse(MovePlanner.interrupts(Move.Lift("pause wanted"), raised, TurntableTarget(a, playing = true, playAngle = 20f)))
     }
 }

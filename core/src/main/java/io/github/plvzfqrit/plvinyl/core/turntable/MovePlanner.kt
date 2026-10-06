@@ -57,8 +57,8 @@ data class TurntableTarget(
 
 /** One physical move. */
 sealed interface Move {
-    /** Raise the arm. If the needle was on the record, it leaves it now. */
-    data class Lift(val reason: String) : Move
+    /** Raise the arm. If the needle was on the record, it leaves it now. A hand lifts it quicker. */
+    data class Lift(val reason: String, val byHand: Boolean = false) : Move
     /** Lower the arm without touching a record (into the rest clip, or hovering down). */
     data object Lower : Move
     /** Lower the needle onto [on]: the music starts. */
@@ -109,7 +109,7 @@ object MovePlanner {
         // A finger holds the arm: lift the needle once, then follow the finger.
         t.grabAngle?.let { g ->
             if (deck.disc == null) return null
-            if (deck.armDown) return Move.Lift("picked up by hand")
+            if (deck.armDown) return Move.Lift("picked up by hand", byHand = true)
             if (abs(deck.armDeg - g) > 0.01f) return Move.FollowHand(g)
             return null
         }
@@ -155,6 +155,22 @@ object MovePlanner {
             deck.armUp && !deck.armParked && deck.armDeg < disc.size.leadInDeg - 1f -> park(deck, "put back to rest")
             deck.armUp && deck.armParked -> Move.Lower                 // settle into the clip
             else -> null
+        }
+    }
+
+    /**
+     * Should [current], still under way from [deck], give way to what [target] wants now?
+     * Only the groove glide is ever cut short (it's the slow one: up to 2 s), and only
+     * for something that matters: a lift (pause, grab, seek, song change, flicking) or
+     * the needle's destination jumping (the lead-out). A target that merely crept on
+     * lets the glide finish, so the arm keeps moving smoothly.
+     */
+    fun interrupts(current: Move, deck: Deck, target: TurntableTarget, seeked: Boolean = false, snap: Boolean = false): Boolean {
+        if (current !is Move.Track) return false
+        return when (val next = next(deck, target, seeked, snap)) {
+            is Move.Lift, is Move.SnapTo -> true
+            is Move.Track -> abs(next.toDeg - current.toDeg) >= SEEK_JUMP_DEG
+            else -> false
         }
     }
 
