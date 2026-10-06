@@ -106,4 +106,24 @@ class TurntableControllerTest {
         assertEquals(playing("Song C").key, h.deck.needleOn)
         assertEquals(PlayerCommand.Play, h.commands.last())
     }
+
+    @Test fun `a play counts after 30 s with the needle down, and not with it up`() {
+        c.onSnapshot(playing())
+        c.onStart()
+        h.run(29_000)
+        assertEquals(0, h.log.entries.size)
+        h.run(1_500)
+        assertEquals(1, h.log.entries.size)
+    }
+
+    @Test fun `a paused record with the needle hovering doesn't count`() {
+        c.onSnapshot(playing())
+        c.onStart()
+        h.run(500)
+        c.onIntent(UserIntent.Cue)                                 // needle up: the player pauses
+        h.run(200)
+        c.onSnapshot(snapshot(sounding = false, positionMs = 60_000, at = h.clock.nowMs()))
+        h.run(60_000)
+        assertEquals(0, h.log.entries.size)
+    }
 }

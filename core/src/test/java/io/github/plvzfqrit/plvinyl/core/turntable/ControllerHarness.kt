@@ -1,6 +1,10 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
 import io.github.plvzfqrit.plvinyl.core.FakeClock
+import io.github.plvzfqrit.plvinyl.core.history.PlayCounter
+import io.github.plvzfqrit.plvinyl.core.history.PlayLog
+import io.github.plvzfqrit.plvinyl.core.history.PlaySink
+import io.github.plvzfqrit.plvinyl.core.history.PlayedSong
 import io.github.plvzfqrit.plvinyl.core.playback.PlayerCommand
 
 /**
@@ -10,7 +14,12 @@ import io.github.plvzfqrit.plvinyl.core.playback.PlayerCommand
 class ControllerHarness {
     val clock = FakeClock()
     val commands = ArrayList<PlayerCommand>()
-    val controller = TurntableController(clock) { commands += it }
+    val log = PlayLog()
+    private val plays = PlayCounter(clock, object : PlaySink {
+        override fun countPlay(song: PlayedSong, listenedMs: Long) = log.countPlay(song, listenedMs, clock.wallMs()).first.id
+        override fun updateListened(id: Long, listenedMs: Long) { log.updateListened(id, listenedMs) }
+    })
+    val controller = TurntableController(clock, { commands += it }, plays)
     var deck = Deck(disc = null)
     val moves = ArrayList<Move>()
     private var lastSeekId = 0

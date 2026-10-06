@@ -12,6 +12,7 @@ composeBom = "2026.02.01"
 profileinstaller = "1.4.1"
 media = "1.8.0"
 kotlinxCoroutines = "1.10.2"
+kotlinxSerialization = "1.9.0"
 datastore = "1.2.1"
 materialIcons = "1.7.8"
 
@@ -38,6 +39,7 @@ androidx-media = { group = "androidx.media", name = "media", version.ref = "medi
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junitJupiter" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
@@ -46,4 +48,5 @@ junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 

@@ -1,5 +1,7 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
+import io.github.plvzfqrit.plvinyl.core.history.PlayCounter
+import io.github.plvzfqrit.plvinyl.core.history.PlayedSong
 import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import io.github.plvzfqrit.plvinyl.core.lighting.lightAt
@@ -31,6 +33,8 @@ import kotlin.math.abs
 class TurntableController(
     private val clock: Clock,
     private val send: (PlayerCommand) -> Unit,
+    /** Counts plays while the turntable is on screen (the app shares it with the background). */
+    private val plays: PlayCounter? = null,
 ) {
     private val arbiter = PlaybackArbiter(clock)
     private val skips = SkipQueue()
@@ -143,6 +147,8 @@ class TurntableController(
     /** The app left the screen. */
     fun onStop() {
         phase = Phase.Stopped
+        // Whatever plays now is counted by the background (if that's on), not the needle.
+        plays?.update(playedSong(), listening = false)
     }
 
     fun onIntent(intent: UserIntent) {
@@ -230,7 +236,10 @@ class TurntableController(
             when (ending) {
                 EndEffect.EnterLeadOut -> sendAll(arbiter.enterLeadOut())
                 EndEffect.LeadOutCancelled -> arbiter.leaveLeadOut()
-                is EndEffect.Repeat -> jumpTo(0L)
+                is EndEffect.Repeat -> {
+                    plays?.restart()                         // going round again: a new play
+                    jumpTo(0L)
+                }
                 is EndEffect.NextRecord -> skips.runOut(ending.key, now)
                 null -> {}
             }
@@ -239,6 +248,8 @@ class TurntableController(
             cueJump?.let { jump ->
                 if (needleOn == null || now - jump.since >= CUE_JUMP_TIMEOUT_MS) sendCueJump()
             }
+            // A play counts while the needle is on the record and the music sounds.
+            plays?.update(playedSong(), listening = audible())
             val effects = skips.tick(
                 now, needleUp = needleOn == null, key = s?.key,
                 positionMs = s?.let { PositionTracker.positionAt(it, now) }, settledKey = settled?.key,
@@ -307,6 +318,9 @@ class TurntableController(
 
     private fun discFor(s: PlayerSnapshot?): Disc? =
         s?.let { Disc(it.key, _settings.value.recordSize.sizeFor(it.durationMs), it.title, it.artist, it.hasArt) }
+
+    private fun playedSong(): PlayedSong? =
+        song?.let { PlayedSong(it.key, it.title, it.artist, it.player, it.durationMs) }
 
     private fun audible(): Boolean {
         val s = song ?: return false
