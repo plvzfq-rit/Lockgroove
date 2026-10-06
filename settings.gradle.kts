@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "PLVinyl"
 include(":app")
- 
+include(":core")
