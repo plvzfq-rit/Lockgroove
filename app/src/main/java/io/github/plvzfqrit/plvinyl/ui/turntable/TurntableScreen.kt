@@ -2,6 +2,7 @@ package io.github.plvzfqrit.plvinyl.ui.turntable
 
 import android.app.Activity
 import android.os.Build
+import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -39,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,6 +64,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -78,6 +82,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.plvzfqrit.plvinyl.audio.SurfaceNoise
 import io.github.plvzfqrit.plvinyl.core.history.Wear
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
@@ -104,6 +109,7 @@ import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
 import io.github.plvzfqrit.plvinyl.ui.stats.StatsScreen
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -163,6 +169,43 @@ fun TurntableScreen(
     }
 
     val counts by vm.history.counts.collectAsStateWithLifecycle()
+
+    // ---------------- Surface noise ----------------
+    // Crackle while the needle is on a sounding record, the locked-groove thump in the
+    // lead-out, silence otherwise (and whenever the app isn't on screen).
+    val noise = remember { SurfaceNoise() }
+    DisposableEffect(noise) { onDispose { noise.release() } }
+    var inForeground by remember { mutableStateOf(false) }
+    LifecycleStartEffect(noise) {
+        inForeground = true
+        onStopOrDispose { inForeground = false }
+    }
+    val noiseSize = disc?.size ?: RecordSize.LP
+    LaunchedEffect(settings.surfaceNoise, inForeground, ui.needleDown, ui.sounding, ui.inLeadOut, noiseSize) {
+        val on = inForeground && ui.needleDown && (ui.sounding || ui.inLeadOut)
+        noise.set(
+            level = if (on) settings.surfaceNoise.gain else 0f,
+            lockedGrooveMs = if (ui.inLeadOut) noiseSize.revolutionMs else 0L,
+        )
+    }
+
+    // ---------------- Dust cover ----------------
+    // Closes after a while with nothing playing and nobody touching; opens on a tap or
+    // as soon as music is wanted. The same idle timer switches the platter motor off:
+    // it coasts to a stop and the app stops redrawing. Any touch or music wakes it.
+    var coverClosed by remember { mutableStateOf(false) }
+    var lastTouch by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(settings.dustCover, ui.playing, lastTouch, ui.title, showSettings) {
+        animator.motorOn = true
+        if (!settings.dustCover) coverClosed = false
+        if (ui.playing || showSettings) {
+            coverClosed = false
+            return@LaunchedEffect
+        }
+        delay(DUST_COVER_IDLE_MS)
+        animator.motorOn = false
+        if (settings.dustCover) coverClosed = true
+    }
 
     // ---------------- Stats ("Liner notes") ----------------
     // One progress value, 0 = turntable, 1 = stats (see the core's PageSwipe).
@@ -242,6 +285,16 @@ fun TurntableScreen(
                         alpha = if (out >= 1f) 0f else 1f
                     } else {
                         alpha = 1f - slope                                  // no blur before Android 12: fade
+                    }
+                }
+                // Notice every touch (without taking it) to keep the dust cover open.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial)
+                            val now = SystemClock.uptimeMillis()
+                            if (now - lastTouch > 1000L) lastTouch = now
+                        }
                     }
                 }
         ) {
@@ -479,12 +532,22 @@ fun TurntableScreen(
                 playing = ui.playing,
                 repeatOne = ui.repeatOne,
                 night = { roomLight().night },
-                onStartStop = { vm.onIntent(UserIntent.StartStop) },
-                onCue = { vm.onIntent(UserIntent.Cue) },
+                onStartStop = { coverClosed = false; vm.onIntent(UserIntent.StartStop) },
+                onCue = { coverClosed = false; vm.onIntent(UserIntent.Cue) },
                 onRepeat = { vm.onIntent(UserIntent.ToggleRepeat) },
-                onPrevious = { vm.onIntent(UserIntent.Flick(-1)) },
-                onNext = { vm.onIntent(UserIntent.Flick(+1)) },
+                onPrevious = { coverClosed = false; vm.onIntent(UserIntent.Flick(-1)) },
+                onNext = { coverClosed = false; vm.onIntent(UserIntent.Flick(+1)) },
                 modifier = Modifier.align(Alignment.BottomCenter),
+            )
+
+            // Dust cover over the top plate (not the front panel: that stays reachable).
+            DustCover(
+                closed = coverClosed,
+                style = backdrop,
+                onOpen = { coverClosed = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(maxHeight - panelHeight),
             )
 
             if (showSettings) {
@@ -545,6 +608,9 @@ private fun PhoneSettingsEffects(settings: Settings, lightRoom: Boolean, audible
         window.attributes = window.attributes.apply { preferredDisplayModeId = modeId }
     }
 }
+
+/** The dust cover closes after this long with nothing playing and no touches. */
+private const val DUST_COVER_IDLE_MS = 2 * 60 * 1000L
 
 /** Swipe the record at least this far to change songs. */
 private val SWIPE_SKIP_DISTANCE = 72.dp

@@ -371,6 +371,8 @@ class TurntableController(
             durationMs = s?.durationMs ?: 0L,
             playing = arbiter.wantPlaying,
             audible = audible(),
+            sounding = s?.sounding == true,
+            needleDown = needleOn != null,
             canGrab = settled != null && !skips.browsing,
             browsing = skips.browsing,
             inLeadOut = end.inLeadOut,

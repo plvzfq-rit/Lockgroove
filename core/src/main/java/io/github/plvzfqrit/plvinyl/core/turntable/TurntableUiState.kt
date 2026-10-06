@@ -12,6 +12,10 @@ data class TurntableUiState(
     val playing: Boolean = false,
     /** The needle is on the playing song's record and the player is sounding. */
     val audible: Boolean = false,
+    /** The player says music is coming out. */
+    val sounding: Boolean = false,
+    /** The needle rests on a record. */
+    val needleDown: Boolean = false,
     /** The arm can be picked up. */
     val canGrab: Boolean = false,
     /** While a finger holds the arm: its angle. */
