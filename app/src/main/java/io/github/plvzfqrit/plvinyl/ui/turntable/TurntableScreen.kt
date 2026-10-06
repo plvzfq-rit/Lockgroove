@@ -54,6 +54,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -73,6 +74,7 @@ import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.UserIntent
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
+import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
@@ -82,6 +84,10 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
+import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
+import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
+import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
+import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -132,7 +138,9 @@ fun TurntableScreen(
     val disc = animator.disc
     val art = disc?.let { arts[it.key] }
 
-    PhoneSettingsEffects(settings, backdrop, audible = ui.audible)
+    PhoneSettingsEffects(settings, lightRoom = backdrop.isLight && ui.roomLight.night < 0.5f, audible = ui.audible)
+    // Room lighting by the clock (or always day / night, from settings).
+    val roomLight = rememberRoomLight(ui.roomLight)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
         animator.spinDegPerSec = settings.spin.degPerSec * (disc?.size?.spinFactor ?: 1f)
@@ -142,6 +150,8 @@ fun TurntableScreen(
 
     Box(modifier.fillMaxSize()) {
         TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value)
+        // The room's light on the background.
+        RoomShade(roomLight, Modifier.fillMaxSize())
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // A platter wider than the screen, bleeding off the left edge, high up.
@@ -327,6 +337,13 @@ fun TurntableScreen(
                 )
             }
 
+            // Lamp / golden-hour light on the deck: over the platter, record and arm,
+            // under the title and keys (those stay readable at any hour).
+            val density = LocalDensity.current
+            val lampCenter = with(density) { Offset(spindleX.toPx(), spindleY.toPx()) }
+            val lampRadius = with(density) { platterRadius.toPx() } * (disc?.size?.radiusOfPlatter ?: RECORD_TO_PLATTER)
+            LampLight(roomLight, lampCenter, lampRadius, Modifier.fillMaxSize())
+
             // Settings: a knob under the tonearm, on the platter's baseline.
             val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
             val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
@@ -334,7 +351,9 @@ fun TurntableScreen(
             SettingsKnob(
                 onClick = { showSettings = true },
                 // 54 dp square (42 dp knob + 6 dp margin): its bottom sits on the platter's baseline.
-                modifier = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp),
+                modifier = Modifier
+                    .offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp)
+                    .graphicsLayer { alpha = 1f - 0.35f * roomLight().night },
             )
 
             val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -350,9 +369,10 @@ fun TurntableScreen(
                 // Title/artist fade to the new song. Long ones scroll (marquee).
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
-                        MarqueeText(t, backdrop.contentColor, MaterialTheme.typography.headlineMedium)
+                        val text = litTextColor(backdrop.contentColor, ui.roomLight)
+                        MarqueeText(t, text, MaterialTheme.typography.headlineMedium)
                         if (a != null) {
-                            MarqueeText(a, backdrop.contentColor.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
+                            MarqueeText(a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -367,7 +387,7 @@ fun TurntableScreen(
                 albumPalette = panelPalette,
                 playing = ui.playing,
                 repeatOne = ui.repeatOne,
-                night = { 0f },
+                night = { roomLight().night },
                 onStartStop = { vm.onIntent(UserIntent.StartStop) },
                 onCue = { vm.onIntent(UserIntent.Cue) },
                 onRepeat = { vm.onIntent(UserIntent.ToggleRepeat) },
@@ -397,7 +417,7 @@ fun TurntableScreen(
 
 /** The settings that act on the phone itself rather than the turntable. */
 @Composable
-private fun PhoneSettingsEffects(settings: Settings, backdrop: BackdropStyle, audible: Boolean) {
+private fun PhoneSettingsEffects(settings: Settings, lightRoom: Boolean, audible: Boolean) {
     val view = LocalView.current
     // Keep the screen awake while the record is playing (like a video app does).
     DisposableEffect(view, audible, settings.keepScreenOn) {
@@ -408,8 +428,8 @@ private fun PhoneSettingsEffects(settings: Settings, backdrop: BackdropStyle, au
     SideEffect { view.isHapticFeedbackEnabled = settings.haptics }
     if (view.isInEditMode) return
     val window = (view.context as Activity).window
-    // Dark status-bar icons on the light Paper background, light icons otherwise.
-    SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = backdrop.isLight }
+    // Dark status-bar icons on the light Paper background by day, light icons otherwise.
+    SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = lightRoom }
     // Battery / Balanced motion: ask the display for a 60 Hz mode (same resolution).
     // Smooth = no preference, so 90/120 Hz phones run at their full rate.
     LaunchedEffect(settings.motion) {
