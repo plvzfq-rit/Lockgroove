@@ -36,6 +36,7 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
     val history = PlayLogStore.get(app)
 
     val ui = controller.ui
+    val held = controller.held
     val target = controller.target
     val settings = controller.settings
     val art = MediaSessionWatcher.art

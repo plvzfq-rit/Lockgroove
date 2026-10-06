@@ -111,6 +111,7 @@ import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
 import io.github.plvzfqrit.plvinyl.ui.stats.StatsScreen
 import kotlin.math.abs
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -460,30 +461,16 @@ fun TurntableScreen(
         // ---- The deck, upper layer: what stays readable at any hour.
         Box(Modifier.fillMaxSize().deckSlide(deckOut)) {
             // While you hold the arm: where in the song the needle would land.
-            val held = ui.grabAngle
-            if (held != null && ui.durationMs > 0L) {
-                val unitDp = platterRadius / TurntableGeometry.PLATTER_RADIUS
-                val heldSize = disc?.size ?: RecordSize.LP
-                val label = if (held >= heldSize.leadInDeg - 1.5f) {
-                    "${formatTime((heldSize.progressAt(held) * ui.durationMs).toLong())} / ${formatTime(ui.durationMs)}"
-                } else "Back to rest"
-                // Just above the pivot, so your finger doesn't cover it.
-                Text(
-                    text = label,
-                    color = if (backdrop.isLight) Color(0xFF2B2A28) else Color.White,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .offset(
-                            x = spindleX + unitDp * (TurntableGeometry.PIVOT_FROM_SPINDLE.x - 150f),
-                            y = spindleY + unitDp * (TurntableGeometry.PIVOT_FROM_SPINDLE.y - 20f),
-                        )
-                        .background(
-                            (if (backdrop.isLight) Color(0xFFF5F2ED) else Color(0xFF303030)).copy(alpha = 0.92f),
-                            RoundedCornerShape(50),
-                        )
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
+            HeldLabel(
+                held = vm.held,
+                durationMs = ui.durationMs,
+                size = disc?.size ?: RecordSize.LP,
+                light = backdrop.isLight,
+                modifier = Modifier.offset(
+                    x = spindleX + (platterRadius / TurntableGeometry.PLATTER_RADIUS) * (TurntableGeometry.PIVOT_FROM_SPINDLE.x - 150f),
+                    y = spindleY + (platterRadius / TurntableGeometry.PLATTER_RADIUS) * (TurntableGeometry.PIVOT_FROM_SPINDLE.y - 20f),
+                ),
+            )
 
             // Title and artist sit on the top plate, between the record and the front edge.
             Column(
@@ -627,6 +614,35 @@ private const val DUST_COVER_IDLE_MS = 2 * 60 * 1000L
 
 /** Swipe the record at least this far to change songs. */
 private val SWIPE_SKIP_DISTANCE = 72.dp
+
+/**
+ * "1:23 / 3:45" while a finger holds the arm (or "Back to rest"), just above the
+ * pivot so the finger doesn't cover it. It collects the held angle itself, so a drag
+ * only redraws this label, not the whole screen.
+ */
+@Composable
+private fun HeldLabel(
+    held: StateFlow<Float?>,
+    durationMs: Long,
+    size: RecordSize,
+    light: Boolean,
+    modifier: Modifier,
+) {
+    val angle by held.collectAsStateWithLifecycle()
+    val a = angle ?: return
+    if (durationMs <= 0L) return
+    val label = if (a >= size.leadInDeg - 1.5f) {
+        "${formatTime((size.progressAt(a) * durationMs).toLong())} / ${formatTime(durationMs)}"
+    } else "Back to rest"
+    Text(
+        text = label,
+        color = if (light) Color(0xFF2B2A28) else Color.White,
+        style = MaterialTheme.typography.labelLarge,
+        modifier = modifier
+            .background((if (light) Color(0xFFF5F2ED) else Color(0xFF303030)).copy(alpha = 0.92f), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
 
 /** m:ss */
 private fun formatTime(ms: Long): String {

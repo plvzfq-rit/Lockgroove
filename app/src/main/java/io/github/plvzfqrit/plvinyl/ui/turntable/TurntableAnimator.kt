@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -35,6 +36,12 @@ const val SPIN_DEG_PER_SEC = 30f
 
 /** Groove-tracking moves up to this size are the slow, steady glide. */
 private const val TRACK_SNAP_DEG = 0.6f
+
+/**
+ * How closely the arm follows a finger: it closes ~63% of the gap every this many
+ * seconds. Small enough to feel attached, big enough to smooth out touch samples.
+ */
+private const val HAND_SMOOTHING_S = 0.035f
 
 /**
  * Animates the turntable. The core's MovePlanner decides each physical move; this
@@ -140,7 +147,7 @@ class TurntableAnimator {
                 // The groove glide is slow (up to 2 s): let a pause, a grab or a song
                 // change cut it short instead of waiting for it to finish.
                 coroutineScope {
-                    val glide = launch { perform(move) }
+                    val glide = launch { perform(move, target) }
                     val watch = launch {
                         target.first { t ->
                             MovePlanner.interrupts(move, deck, t, seeked = t.seekId != lastSeekId, snap = t.snapId != lastSnapId)
@@ -151,7 +158,7 @@ class TurntableAnimator {
                     watch.cancel()
                 }
             } else {
-                perform(move)
+                perform(move, target)
             }
             onFinished(move, deck)
         }
@@ -159,11 +166,19 @@ class TurntableAnimator {
 
     // ----------------------------------------------------------------- moves
 
-    private suspend fun perform(move: Move) {
+    private suspend fun perform(move: Move, target: StateFlow<TurntableTarget>) {
         when (move) {
-            is Move.Lift -> {
+            // Picked up by hand: the needle is off the vinyl as soon as the arm starts to
+            // rise, so it follows the finger while it lifts, instead of after.
+            is Move.Lift -> if (move.byHand) {
                 needleOn = null
-                armLift.animateTo(1f, tween(if (move.byHand) 150 else 350, easing = FastOutSlowInEasing))
+                coroutineScope {
+                    launch { armLift.animateTo(1f, tween(150, easing = FastOutSlowInEasing)) }
+                    followHand(target)
+                }
+            } else {
+                needleOn = null
+                armLift.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
             }
             // Cue lever descent: slow and damped, no bounce.
             Move.Lower -> armLift.animateTo(0f, tween(550, easing = LinearOutSlowInEasing))
@@ -183,11 +198,42 @@ class TurntableAnimator {
                 val ms = if (abs(armAngle.value - move.toDeg) <= TRACK_SNAP_DEG) 2000 else 1500
                 armAngle.animateTo(move.toDeg, tween(ms, easing = LinearEasing))
             }
-            is Move.FollowHand -> armAngle.snapTo(move.toDeg)
+            is Move.FollowHand -> followHand(target)
             Move.RemoveRecord -> removeRecord()
             is Move.PlaceRecord -> placeRecord(move.disc)
             is Move.UpdateDisc -> disc = move.disc
             is Move.SnapTo -> snapTo(move.deck)
+        }
+    }
+
+    /**
+     * Follows the finger until it lets go. Every frame the arm closes part of the gap to
+     * the finger (frame-rate independent), so it glides along like an arm with a little
+     * weight to it, instead of jumping from touch sample to touch sample.
+     */
+    private suspend fun followHand(target: StateFlow<TurntableTarget>) {
+        var last = 0L
+        var held = target.value.grabAngle ?: return
+        while (true) {
+            if (abs(held - armAngle.value) < 0.001f) {
+                // Caught up: rest until the finger moves (or lets go).
+                armAngle.snapTo(held)
+                val next = target.first { it.grabAngle != held }.grabAngle ?: return
+                held = next
+                last = 0L
+            }
+            var step = armAngle.value
+            withFrameNanos { now ->
+                val dt = if (last == 0L) 1f / 60f else ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                last = now
+                step += (held - step) * (1f - exp(-dt / HAND_SMOOTHING_S))
+            }
+            armAngle.snapTo(step)
+            // Let go: land exactly where the finger left it, so the needle drops right away.
+            held = target.value.grabAngle ?: run {
+                armAngle.animateTo(held, tween(80, easing = LinearOutSlowInEasing))
+                return
+            }
         }
     }
 

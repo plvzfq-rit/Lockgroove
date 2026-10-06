@@ -54,6 +54,14 @@ class TurntableController(
     private val _ui = MutableStateFlow(TurntableUiState())
     val ui: StateFlow<TurntableUiState> = _ui.asStateFlow()
 
+    private val _held = MutableStateFlow<Float?>(null)
+
+    /**
+     * While a finger holds the arm: the angle it's held at. Its own flow, because it
+     * changes with every touch sample and only the little time label needs it.
+     */
+    val held: StateFlow<Float?> = _held.asStateFlow()
+
     /** Change the settings (from the settings sheet, or loaded from storage). */
     fun updateSettings(change: (Settings) -> Settings) {
         val next = change(_settings.value)
@@ -175,6 +183,7 @@ class TurntableController(
             is UserIntent.HoldArm -> grabAngle = intent.angleDeg
             UserIntent.LetGoOfArm -> letGoOfArm()
         }
+        publishHeld()
         refresh()
     }
 
@@ -219,6 +228,7 @@ class TurntableController(
                 end.reset()
                 cueJump = null
                 grabAngle = null
+                publishHeld()
                 dropAngle = null
                 parkWhenPaused = false
                 snapToPlayer()
@@ -376,7 +386,6 @@ class TurntableController(
             canGrab = settled != null && !skips.browsing,
             browsing = skips.browsing,
             inLeadOut = end.inLeadOut,
-            grabAngle = grabAngle,
             repeatOne = _settings.value.repeatOne,
             player = s?.player,
             learnedCrossfadeMs = s?.let { crossfade.leadFor(it.player) } ?: 0L,
@@ -391,6 +400,10 @@ class TurntableController(
         val size = settled?.size ?: RecordSize.LP
         if (end.inLeadOut) return size.lockedGrooveDeg
         return dropAngle ?: size.playingAngle(progress)
+    }
+
+    private fun publishHeld() {
+        _held.value = grabAngle
     }
 
     private fun sendAll(commands: List<PlayerCommand>) = commands.forEach(send)

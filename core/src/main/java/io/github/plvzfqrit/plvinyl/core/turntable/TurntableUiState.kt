@@ -18,8 +18,6 @@ data class TurntableUiState(
     val needleDown: Boolean = false,
     /** The arm can be picked up. */
     val canGrab: Boolean = false,
-    /** While a finger holds the arm: its angle. */
-    val grabAngle: Float? = null,
     /** Flicking through songs (the arm waits parked). */
     val browsing: Boolean = false,
     /** The needle is circling the locked groove after the music ended. */
