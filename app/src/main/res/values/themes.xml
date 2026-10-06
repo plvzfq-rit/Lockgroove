@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.PLVinyl" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Dark from the first frame: no white flash while the turntable is drawn. -->
+    <style name="Theme.PLVinyl" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/plinth</item>
+    </style>
 </resources>
