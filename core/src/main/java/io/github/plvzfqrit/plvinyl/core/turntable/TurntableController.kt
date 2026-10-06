@@ -1,5 +1,6 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
+import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.Clock
 import io.github.plvzfqrit.plvinyl.core.model.Disc
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
@@ -13,6 +14,7 @@ import io.github.plvzfqrit.plvinyl.core.playback.PositionTracker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.abs
 
 /*
  * The one place that decides. Player reports come in as snapshots, the listener's
@@ -35,6 +37,10 @@ class TurntableController(
 
     private val _ui = MutableStateFlow(TurntableUiState())
     val ui: StateFlow<TurntableUiState> = _ui.asStateFlow()
+
+    /** The app's own repeat one (the ↻1 key). */
+    var repeatOne = false
+        set(value) { field = value; refresh() }
 
     /** 7" or 12", from the song length (a setting). */
     var recordSizeChoice: RecordSizeChoice = RecordSizeChoice.Auto
@@ -111,6 +117,24 @@ class TurntableController(
 
     fun onIntent(intent: UserIntent) {
         when (intent) {
+            UserIntent.StartStop -> if (arbiter.wantPlaying) {
+                arbiter.wantPlaying = false
+                parkWhenPaused = true                        // stop: the arm goes home
+            } else {
+                parkWhenPaused = false
+                arbiter.wantPlaying = true                   // start: needle onto the record
+            }
+            UserIntent.Cue -> {
+                // The cue lever only raises / lowers the arm where it is. With the arm home
+                // in its rest there's nothing to lower it onto: ▶■ is what swings it over.
+                val armAtRest = !arbiter.wantPlaying && abs(deck.armDeg - ArmGeometry.REST_DEG) < 0.5f
+                if (!armAtRest) {
+                    parkWhenPaused = false
+                    // Lever up = lift (pause, arm hovers); lever down = lower (play).
+                    arbiter.wantPlaying = needleOn == null
+                }
+            }
+            UserIntent.ToggleRepeat -> repeatOne = !repeatOne
             is UserIntent.HoldArm -> grabAngle = intent.angleDeg
             UserIntent.LetGoOfArm -> letGoOfArm()
         }
@@ -222,6 +246,7 @@ class TurntableController(
     private fun refresh() {
         val now = clock.nowMs()
         if (dropAngle != null && now >= dropUntil) dropAngle = null
+        if (arbiter.wantPlaying) parkWhenPaused = false
         val s = song
         if (phase == Phase.Running) {
             settle(now)
@@ -245,6 +270,7 @@ class TurntableController(
             audible = audible(),
             canGrab = settled != null,
             grabAngle = grabAngle,
+            repeatOne = repeatOne,
         )
     }
 

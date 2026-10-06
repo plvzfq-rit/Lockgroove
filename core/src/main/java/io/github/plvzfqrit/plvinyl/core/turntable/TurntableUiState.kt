@@ -14,4 +14,6 @@ data class TurntableUiState(
     val canGrab: Boolean = false,
     /** While a finger holds the arm: its angle. */
     val grabAngle: Float? = null,
+    /** ↻1 is on (the key's light). */
+    val repeatOne: Boolean = false,
 )
