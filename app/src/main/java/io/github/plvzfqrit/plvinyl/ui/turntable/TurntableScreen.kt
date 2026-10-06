@@ -1,14 +1,20 @@
 package io.github.plvzfqrit.plvinyl.ui.turntable
 
 import android.graphics.Bitmap
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -26,7 +32,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import io.github.plvzfqrit.plvinyl.core.model.Disc
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
+import io.github.plvzfqrit.plvinyl.core.model.SongKey
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
@@ -47,17 +55,18 @@ fun TurntableScreen(
     backdrop: BackdropStyle,
     finish: VinylFinish,
     /** The record on the platter, or null for an empty platter. */
-    record: RecordSize?,
-    seedKey: String,
-    title: String?,
-    artist: String?,
+    disc: Disc?,
+    /** Album art for the record's label. */
     art: Bitmap?,
+    /** The song shown under the record (the player's, which can run ahead of the record). */
+    songTitle: String,
+    songArtist: String?,
     armAngleDeg: Float,
     armLift: Float,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        TurntableBackdrop(style = backdrop, art = art, artKey = seedKey)
+        TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value)
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // Same placement as the old app: a platter wider than the screen,
@@ -91,21 +100,21 @@ fun TurntableScreen(
                 Canvas(Modifier.fillMaxSize()) {
                     drawPlatterFelt(center = center, outerRadius = size.minDimension / 2f)
                 }
-                if (record != null) {
+                if (disc != null) {
                     VinylRecord(
                         art = art,
                         finish = finish,
-                        seedKey = seedKey,
+                        seedKey = disc.key.value,
                         rotation = { 0f },
-                        size = record,
-                        title = title,
-                        artist = artist,
+                        size = disc.size,
+                        title = disc.title,
+                        artist = disc.artist,
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
                                 // The shadow follows the record, not the platter-sized layer.
                                 shadowElevation = 1.dp.toPx()
-                                shape = RecordShape(record.radiusOfPlatter)
+                                shape = RecordShape(disc.size.radiusOfPlatter)
                                 clip = false
                             },
                     )
@@ -121,6 +130,24 @@ fun TurntableScreen(
                     lift = armLift,
                     colors = armColors,
                 )
+            }
+
+            // Title and artist sit on the top plate, under the record.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = platterTop + platterSize + 16.dp)
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                // Title/artist fade to the new song. Long ones scroll (marquee).
+                Crossfade(targetState = songTitle to songArtist, animationSpec = tween(400), label = "title") { (t, a) ->
+                    Column(Modifier.fillMaxWidth()) {
+                        MarqueeText(t, backdrop.contentColor, MaterialTheme.typography.headlineMedium)
+                        if (a != null) {
+                            MarqueeText(a, backdrop.contentColor.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
             }
         }
     }
@@ -143,11 +170,10 @@ private fun TurntableScreenPreview() {
     TurntableScreen(
         backdrop = BackdropStyle.Charcoal,
         finish = VinylFinish.Black,
-        record = RecordSize.LP,
-        seedKey = "PLVinyl|plvzfqrit",
-        title = "PLVinyl",
-        artist = "plvzfqrit",
+        disc = Disc(SongKey.of("PLVinyl", "plvzfqrit"), RecordSize.LP, "PLVinyl", "plvzfqrit"),
         art = null,
+        songTitle = "PLVinyl",
+        songArtist = "plvzfqrit",
         armAngleDeg = RecordSize.LP.playingAngle(0.3f),
         armLift = 0f,
     )
