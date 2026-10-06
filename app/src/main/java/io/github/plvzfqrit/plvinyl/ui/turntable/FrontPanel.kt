@@ -50,8 +50,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylPalette
+import io.github.plvzfqrit.plvinyl.ui.lighting.drawLampLight
 import kotlinx.coroutines.delay
 import kotlin.math.max
 
@@ -77,8 +79,12 @@ fun FrontPanel(
     albumPalette: VinylPalette?,
     playing: Boolean,
     repeatOne: Boolean,
-    /** 0 = daylight, 1 = night (the face falls into shadow, the lit keys glow). */
-    night: () -> Float,
+    /** The room's light. The face gets the same light as the deck around it; lit keys glow. */
+    light: () -> RoomLight,
+    /** Where the lamp's pool is centred, in this panel's coordinates (px). */
+    lampCenter: Offset,
+    /** The record's radius (px): the lamp's pool is sized from it. */
+    lampRadius: Float,
     onStartStop: () -> Unit,
     onCue: () -> Unit,
     onRepeat: () -> Unit,
@@ -92,6 +98,7 @@ fun FrontPanel(
     val albumA by animateColorAsState(targetA, tween(900, easing = FastOutSlowInEasing), label = "panelA")
     val albumB by animateColorAsState(targetB, tween(900, easing = FastOutSlowInEasing), label = "panelB")
     val album = albumA to albumB
+    val night = { light().night }
 
     Box(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
@@ -105,7 +112,7 @@ fun FrontPanel(
                             drawRect(lip)
                             drawLine(Color.Black.copy(alpha = 0.25f), Offset(0f, size.height - 0.5f),
                                 Offset(size.width, size.height - 0.5f), 1f)
-                            drawRect(Color.Black.copy(alpha = 0.6f * night()))
+                            drawLampLight(light(), lampCenter, lampRadius, glint = 0f)
                         }
                     }
             )
@@ -114,9 +121,10 @@ fun FrontPanel(
                     .fillMaxWidth()
                     .drawWithCache {
                         val texture = faceTexture(style, album, size, 4.dp.toPx())
+                        val faceLamp = lampCenter - Offset(0f, 12.dp.toPx())        // the face sits under the lip
                         onDrawBehind {
                             texture()
-                            drawRect(Color.Black.copy(alpha = 0.6f * night()))
+                            drawLampLight(light(), faceLamp, lampRadius, glint = 0f)
                         }
                     }
                     .navigationBarsPadding()

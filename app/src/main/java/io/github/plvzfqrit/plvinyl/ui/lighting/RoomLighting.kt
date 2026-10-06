@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -59,44 +60,60 @@ fun RoomShade(light: () -> RoomLight, modifier: Modifier) {
 }
 
 /**
- * Light on the deck: golden-hour warmth from the left, and at night a desk lamp
- * above the record (a warm pool on it, darkness around it, a glint on the vinyl).
+ * The room's light over the deck: golden-hour warmth from the left, and at night a
+ * desk lamp above the record (a warm pool on it, darkness around it, a glint on the
+ * vinyl). It's fixed in the room: when the deck slides away for the stats, it slides
+ * out from under the light, and the room stays lit the same.
  * @param lampCenter where the pool is centred (the record's center), in px
  * @param recordRadius record radius in px
+ * @param glint how much of the lamp's reflection on the vinyl shows (0 once the record is gone)
  */
 @Composable
-fun LampLight(light: () -> RoomLight, lampCenter: Offset, recordRadius: Float, modifier: Modifier) {
-    Canvas(modifier) {
-        val l = light()
-        if (l.golden > 0f) {
-            drawRect(
-                Brush.horizontalGradient(
-                    0f to Color(0xFFFFAA46).copy(alpha = 0.30f * l.golden),
-                    0.45f to Color(0xFFFF963C).copy(alpha = 0.12f * l.golden),
-                    1f to Color(0xFF5A280A).copy(alpha = 0.28f * l.golden),
-                )
+fun LampLight(
+    light: () -> RoomLight,
+    lampCenter: Offset,
+    recordRadius: Float,
+    modifier: Modifier,
+    glint: () -> Float = { 1f },
+) {
+    Canvas(modifier) { drawLampLight(light(), lampCenter, recordRadius, glint()) }
+}
+
+/**
+ * Draws the lamp / golden-hour light into this scope, for things that apply the room's
+ * light themselves (the front panel). [lampCenter] is in this scope's coordinates.
+ */
+fun DrawScope.drawLampLight(l: RoomLight, lampCenter: Offset, recordRadius: Float, glint: Float = 1f) {
+    if (l.golden > 0f) {
+        drawRect(
+            Brush.horizontalGradient(
+                0f to Color(0xFFFFAA46).copy(alpha = 0.30f * l.golden),
+                0.45f to Color(0xFFFF963C).copy(alpha = 0.12f * l.golden),
+                1f to Color(0xFF5A280A).copy(alpha = 0.28f * l.golden),
             )
-        }
-        if (l.night > 0f) {
-            val n = l.night
-            val pool = recordRadius * (1.25f - 0.45f * l.late)
-            drawRect(
-                Brush.radialGradient(
-                    0f to Color(0xFFFFBE6E).copy(alpha = 0.10f * n),
-                    0.55f to Color(0xFF1E1206).copy(alpha = 0.30f * n + 0.20f * l.late),
-                    1f to Color(0xFF0A0704).copy(alpha = 0.75f * n + 0.15f * l.late),
-                    center = lampCenter, radius = pool,
-                )
+        )
+    }
+    if (l.night > 0f) {
+        val n = l.night
+        val pool = recordRadius * (1.25f - 0.45f * l.late)
+        drawRect(
+            Brush.radialGradient(
+                0f to Color(0xFFFFBE6E).copy(alpha = 0.10f * n),
+                0.55f to Color(0xFF1E1206).copy(alpha = 0.30f * n + 0.20f * l.late),
+                1f to Color(0xFF0A0704).copy(alpha = 0.75f * n + 0.15f * l.late),
+                center = lampCenter, radius = pool,
             )
-            // The lamp's reflection on the vinyl
-            val glint = lampCenter + Offset(recordRadius * 0.32f, -recordRadius * 0.55f)
+        )
+        // The lamp's reflection on the vinyl
+        if (glint > 0f) {
+            val at = lampCenter + Offset(recordRadius * 0.32f, -recordRadius * 0.55f)
             val gr = recordRadius * 0.18f
             drawCircle(
                 Brush.radialGradient(
-                    listOf(Color(0xFFFFD296).copy(alpha = 0.32f * n * (1f - 0.4f * l.late)), Color.Transparent),
-                    center = glint, radius = gr,
+                    listOf(Color(0xFFFFD296).copy(alpha = 0.32f * n * (1f - 0.4f * l.late) * glint), Color.Transparent),
+                    center = at, radius = gr,
                 ),
-                gr, glint,
+                gr, at,
             )
         }
     }

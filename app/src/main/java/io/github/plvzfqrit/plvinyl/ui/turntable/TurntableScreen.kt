@@ -117,8 +117,10 @@ import kotlinx.coroutines.launch
  * The turntable. The controller (in the view model) decides; the animator performs
  * each move; this draws them and passes your touches on as intents.
  *
- * Layers, bottom to top: backdrop → tonearm base → platter + record → tonearm arm
- * → title.
+ * Layers, bottom to top: backdrop and room shade → the deck (tonearm base, platter,
+ * record, arm, knob) → the room's light, fixed in place → the deck's readable layer
+ * (title, held label, front panel, dust cover) → the stats. Both deck layers slide
+ * away together for the stats; the light stays, so the room looks the same.
  */
 @Composable
 fun TurntableScreen(
@@ -226,7 +228,7 @@ fun TurntableScreen(
         snapshotFlow { statsProgress.value < PageSwipe.FADE_OUT_END }.collect { animator.visible = it }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier
             .fillMaxSize()
             // ONE swipe for the whole page, both directions, from anywhere (except the
@@ -258,57 +260,42 @@ fun TurntableScreen(
                     animateStats(open)
                 }
             }
+            // Notice every touch (without taking it) to keep the dust cover open.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                        val now = SystemClock.uptimeMillis()
+                        if (now - lastTouch > 1000L) lastTouch = now
+                    }
+                }
+            }
     ) {
+        val screenWidth = maxWidth
+        val screenHeight = maxHeight
+        // A platter wider than the screen, bleeding off the left edge, high up.
+        val platterSize = maxWidth * 1.213f
+        val platterRadius = platterSize / 2
+        val platterTop = (maxHeight - platterSize) / 2 * (1 - 0.65f)
+        val platterLeft = (maxWidth - platterSize) / 2 * (1 + 2.13f)
+        val spindleX = platterLeft + platterRadius
+        val spindleY = platterTop + platterRadius
+        val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val panelHeight = FRONT_PANEL_HEIGHT + navInset
+        val armColors = remember(backdrop) { backdrop.tonearmColors() }
+
+        // The lamp hangs over the record's resting place.
+        val lampCenter = with(screenDensity) { Offset(spindleX.toPx(), spindleY.toPx()) }
+        val lampRadius = with(screenDensity) { platterRadius.toPx() } * (disc?.size?.radiusOfPlatter ?: RECORD_TO_PLATTER)
+        // How far the deck has slid away for the stats, 0..1.
+        val deckOut = { (statsProgress.value / PageSwipe.FADE_OUT_END).coerceIn(0f, 1f) }
+
         TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value)
         // The room's light on the background.
         RoomShade(roomLight, Modifier.fillMaxSize())
 
-        BoxWithConstraints(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    // The whole deck slides off to the left like it's going down a slope:
-                    // it tilts away and shrinks a little, and the closer it gets to the
-                    // edge, the more it blurs (slowly at first, then quickly).
-                    val out = (statsProgress.value / PageSwipe.FADE_OUT_END).coerceIn(0f, 1f)
-                    val slope = out * out
-                    translationX = -out * size.width
-                    rotationY = 22f * slope                                 // left side tips away from you
-                    cameraDistance = 12f * density
-                    transformOrigin = TransformOrigin(0f, 0.5f)
-                    scaleX = 1f - 0.12f * slope
-                    scaleY = 1f - 0.12f * slope
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        renderEffect = if (out > 0.001f && out < 1f) {
-                            val r = 2.dp.toPx() + slope * 30.dp.toPx()
-                            BlurEffect(r, r * 0.6f, TileMode.Decal)
-                        } else null
-                        alpha = if (out >= 1f) 0f else 1f
-                    } else {
-                        alpha = 1f - slope                                  // no blur before Android 12: fade
-                    }
-                }
-                // Notice every touch (without taking it) to keep the dust cover open.
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent(PointerEventPass.Initial)
-                            val now = SystemClock.uptimeMillis()
-                            if (now - lastTouch > 1000L) lastTouch = now
-                        }
-                    }
-                }
-        ) {
-            // A platter wider than the screen, bleeding off the left edge, high up.
-            val platterSize = maxWidth * 1.213f
-            val platterRadius = platterSize / 2
-            val platterTop = (maxHeight - platterSize) / 2 * (1 - 0.65f)
-            val platterLeft = (maxWidth - platterSize) / 2 * (1 + 2.13f)
-            val spindleX = platterLeft + platterRadius
-            val spindleY = platterTop + platterRadius
-
-            val armColors = remember(backdrop) { backdrop.tonearmColors() }
-
+        // ---- The deck, lower layer: the turntable itself, lit by the room.
+        Box(Modifier.fillMaxSize().deckSlide(deckOut)) {
             // Tonearm base: below the platter, so the platter overlaps the plate.
             Canvas(Modifier.fillMaxSize()) {
                 drawTonearmBaseForPlatter(
@@ -455,6 +442,23 @@ fun TurntableScreen(
                 )
             }
 
+            // Settings: a knob under the tonearm, on the platter's baseline.
+            val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
+            val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
+            val settingsCenterX = minOf(pivotX + unit * 40f, screenWidth - 12.dp - 27.dp)
+            SettingsKnob(
+                onClick = { showSettings = true },
+                // 54 dp square (42 dp knob + 6 dp margin): its bottom sits on the platter's baseline.
+                modifier = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp),
+            )
+        }
+
+        // ---- The room's light: golden hour, or the desk lamp at night. It stays put
+        // when the deck slides away, so the stats sit in the same light.
+        LampLight(roomLight, lampCenter, lampRadius, Modifier.fillMaxSize(), glint = { 1f - deckOut() })
+
+        // ---- The deck, upper layer: what stays readable at any hour.
+        Box(Modifier.fillMaxSize().deckSlide(deckOut)) {
             // While you hold the arm: where in the song the needle would land.
             val held = ui.grabAngle
             if (held != null && ui.durationMs > 0L) {
@@ -481,27 +485,6 @@ fun TurntableScreen(
                 )
             }
 
-            // Lamp / golden-hour light on the deck: over the platter, record and arm,
-            // under the title and keys (those stay readable at any hour).
-            val lampCenter = with(screenDensity) { Offset(spindleX.toPx(), spindleY.toPx()) }
-            val lampRadius = with(screenDensity) { platterRadius.toPx() } * (disc?.size?.radiusOfPlatter ?: RECORD_TO_PLATTER)
-            LampLight(roomLight, lampCenter, lampRadius, Modifier.fillMaxSize())
-
-            // Settings: a knob under the tonearm, on the platter's baseline.
-            val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
-            val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
-            val settingsCenterX = minOf(pivotX + unit * 40f, maxWidth - 12.dp - 27.dp)
-            SettingsKnob(
-                onClick = { showSettings = true },
-                // 54 dp square (42 dp knob + 6 dp margin): its bottom sits on the platter's baseline.
-                modifier = Modifier
-                    .offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp)
-                    .graphicsLayer { alpha = 1f - 0.35f * roomLight().night },
-            )
-
-            val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            val panelHeight = FRONT_PANEL_HEIGHT + navInset
-
             // Title and artist sit on the top plate, between the record and the front edge.
             Column(
                 Modifier
@@ -524,13 +507,17 @@ fun TurntableScreen(
             // The controls live on the FRONT of the plinth:
             // |◀◀ previous · ▶■ start/stop (stop sends the arm home) · ▲▼ cue (pause in
             // place, needle hovers) · ↻1 repeat one · ▶▶| next.
+            // It takes the room's light itself (so its keys stay readable and lit keys glow).
             val panelPalette = remember(art) { art?.let(::extractVinylPalette) }
+            val panelTop = with(screenDensity) { (screenHeight - panelHeight).toPx() }
             FrontPanel(
                 style = backdrop,
                 albumPalette = panelPalette,
                 playing = ui.playing,
                 repeatOne = ui.repeatOne,
-                night = { roomLight().night },
+                light = roomLight,
+                lampCenter = lampCenter - Offset(0f, panelTop),
+                lampRadius = lampRadius,
                 onStartStop = { coverClosed = false; vm.onIntent(UserIntent.StartStop) },
                 onCue = { coverClosed = false; vm.onIntent(UserIntent.Cue) },
                 onRepeat = { vm.onIntent(UserIntent.ToggleRepeat) },
@@ -544,9 +531,10 @@ fun TurntableScreen(
                 closed = coverClosed,
                 style = backdrop,
                 onOpen = { coverClosed = false },
+                night = { roomLight().night },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(maxHeight - panelHeight),
+                    .height(screenHeight - panelHeight),
             )
 
             if (showSettings) {
@@ -567,14 +555,40 @@ fun TurntableScreen(
         }
 
         if (statsOnScreen) {
-            // Pops in on the same background once the deck has gone. In the dark room
-            // the stats use the dark colors, whatever the background.
+            // Pops in on the same background, in the same light, once the deck has gone.
+            // In the dark room the stats use the dark colors, whatever the background.
             StatsScreen(
                 history = vm.history,
                 style = if (ui.roomLight.night > 0.5f) BackdropStyle.Charcoal else backdrop,
                 reveal = { PageSwipe.reveal(statsProgress.value) },
             )
         }
+    }
+}
+
+/**
+ * The deck sliding off to the left like it's going down a slope: it tilts away and
+ * shrinks a little, and the closer it gets to the edge, the more it blurs (slowly at
+ * first, then quickly). Both deck layers use it, so they move as one.
+ * @param out how far it has gone, 0..1 (read only here, in the layer)
+ */
+private fun Modifier.deckSlide(out: () -> Float): Modifier = graphicsLayer {
+    val o = out()
+    val slope = o * o
+    translationX = -o * size.width
+    rotationY = 22f * slope                                 // left side tips away from you
+    cameraDistance = 12f * density
+    transformOrigin = TransformOrigin(0f, 0.5f)
+    scaleX = 1f - 0.12f * slope
+    scaleY = 1f - 0.12f * slope
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        renderEffect = if (o > 0.001f && o < 1f) {
+            val r = 2.dp.toPx() + slope * 30.dp.toPx()
+            BlurEffect(r, r * 0.6f, TileMode.Decal)
+        } else null
+        alpha = if (o >= 1f) 0f else 1f
+    } else {
+        alpha = 1f - slope                                  // no blur before Android 12: fade
     }
 }
 

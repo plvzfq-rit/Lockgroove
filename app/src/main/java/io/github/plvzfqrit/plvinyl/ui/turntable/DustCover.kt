@@ -27,7 +27,14 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
  * ---------------------------------------------------------------------- */
 
 @Composable
-fun DustCover(closed: Boolean, style: BackdropStyle, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun DustCover(
+    closed: Boolean,
+    style: BackdropStyle,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** 0 = daylight, 1 = night: the hinges and the lid's bright edges fall into shadow. */
+    night: () -> Float = { 0f },
+) {
     val amount by animateFloatAsState(
         targetValue = if (closed) 1f else 0f,
         animationSpec = tween(if (closed) 1400 else 700, easing = FastOutSlowInEasing),
@@ -47,11 +54,13 @@ fun DustCover(closed: Boolean, style: BackdropStyle, onOpen: () -> Unit, modifie
             )
     ) {
         Canvas(Modifier.fillMaxSize()) {
+            val dim = 1f - 0.7f * night()
             // Hinges at the back edge (always visible, like on the real deck)
             val hingeW = 34.dp.toPx(); val hingeH = 8.dp.toPx()
             for (fx in floatArrayOf(0.2f, 0.8f)) {
+                val hinge = if (light) Color(0xFFB9B2A7) else Color(0xFF4A4A4A)
                 drawRoundRect(
-                    if (light) Color(0xFFB9B2A7) else Color(0xFF4A4A4A),
+                    Color(hinge.red * dim, hinge.green * dim, hinge.blue * dim),
                     topLeft = Offset(size.width * fx - hingeW / 2, 0f), size = Size(hingeW, hingeH),
                     cornerRadius = CornerRadius(2.dp.toPx()),
                 )
@@ -72,7 +81,7 @@ fun DustCover(closed: Boolean, style: BackdropStyle, onOpen: () -> Unit, modifie
             drawRect(
                 Brush.linearGradient(
                     0f to Color.Transparent, 0.42f to Color.Transparent,
-                    0.5f to Color.White.copy(alpha = 0.10f * amount),
+                    0.5f to Color.White.copy(alpha = 0.10f * amount * dim),
                     0.58f to Color.Transparent, 1f to Color.Transparent,
                     start = Offset(0f, 0f), end = Offset(size.width, h),
                 ),
@@ -80,7 +89,7 @@ fun DustCover(closed: Boolean, style: BackdropStyle, onOpen: () -> Unit, modifie
             )
             // Front edge of the lid catching the light
             drawLine(
-                Color.White.copy(alpha = 0.35f * amount), Offset(0f, h - 1.dp.toPx()), Offset(size.width, h - 1.dp.toPx()),
+                Color.White.copy(alpha = 0.35f * amount * dim), Offset(0f, h - 1.dp.toPx()), Offset(size.width, h - 1.dp.toPx()),
                 strokeWidth = 1.5.dp.toPx(),
             )
         }
