@@ -43,19 +43,7 @@ import kotlin.random.Random
  *
  * Colors are sampled from the reference screenshots.
  */
-enum class BackdropStyle(
-    /** Text / icon color that reads well on this background. */
-    val contentColor: Color,
-    /** True when status-bar icons should be dark. */
-    val isLight: Boolean,
-) {
-    Paper(contentColor = Color(0xFF2B2A28), isLight = true),
-    Charcoal(contentColor = Color.White, isLight = false),
-    Amber(contentColor = Color.White, isLight = false),
-    AlbumBlur(contentColor = Color.White, isLight = false);
-
-    fun next(): BackdropStyle = values()[(ordinal + 1) % values().size]
-}
+enum class BackdropStyle { Paper, Charcoal, Amber, AlbumBlur }
 
 @Composable
 fun TurntableBackdrop(
@@ -109,7 +97,7 @@ fun TurntableBackdrop(
 }
 
 /** Tonearm colors that belong with each background. */
-fun BackdropStyle.tonearmColors(): TonearmColors = when (this) {
+internal fun BackdropStyle.tonearmColors(): TonearmColors = when (this) {
     // White turntable: cream plate, white arm parts, silver tube.
     BackdropStyle.Paper -> TonearmColors(
         plateLight = Color(0xFFFBF9F5), plateDark = Color(0xFFEFECE6),

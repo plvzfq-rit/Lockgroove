@@ -18,7 +18,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 
 /* ------------------------------------------------------------------------
  * Dust cover: a smoked acrylic lid hinged at the back (top of the screen).
@@ -29,7 +28,8 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 @Composable
 fun DustCover(
     closed: Boolean,
-    style: BackdropStyle,
+    /** A light deck (the lid and hinges are drawn to suit it). */
+    light: Boolean,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
     /** 0 = daylight, 1 = night: the hinges and the lid's bright edges fall into shadow. */
@@ -40,7 +40,6 @@ fun DustCover(
         animationSpec = tween(if (closed) 1400 else 700, easing = FastOutSlowInEasing),
         label = "lid",
     )
-    val light = style.isLight
     val tint = if (light) Color(0xFF3A3632) else Color(0xFF0A0A0A)
     Box(
         modifier

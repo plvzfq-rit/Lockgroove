@@ -9,16 +9,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
-import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
-import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
+import io.github.plvzfqrit.plvinyl.ui.drawing.Look
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-
-/** The deck's look: background and vinyl. Kept apart from Settings because they're UI types. */
-data class Look(
-    val backdrop: BackdropStyle = BackdropStyle.Charcoal,
-    val finish: VinylFinish = VinylFinish.Black,
-)
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 

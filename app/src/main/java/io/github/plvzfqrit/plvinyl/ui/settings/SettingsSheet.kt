@@ -55,6 +55,7 @@ import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.settings.SpinSpeed
 import io.github.plvzfqrit.plvinyl.core.settings.SurfaceNoiseLevel
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
+import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.rememberFinishPreview
@@ -69,7 +70,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsSheet(
-    current: BackdropStyle,
+    deck: DeckColors,
     finish: VinylFinish,
     art: Bitmap?,
     seedKey: String?,
@@ -82,7 +83,8 @@ fun SettingsSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val light = current.isLight
+    val current = deck.style
+    val light = deck.isLight
     val fg = if (light) Color(0xFF2B2A28) else Color.White
     val bg = if (light) Color(0xFFF7F4EF) else Color(0xFF242424)
     val view = LocalView.current

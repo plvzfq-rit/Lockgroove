@@ -65,6 +65,7 @@ import io.github.plvzfqrit.plvinyl.core.stats.StatsPeriod
 import io.github.plvzfqrit.plvinyl.core.stats.TopRecord
 import io.github.plvzfqrit.plvinyl.data.PlayLogStore
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
+import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
 import io.github.plvzfqrit.plvinyl.ui.drawing.rememberPacedSpin
@@ -98,9 +99,9 @@ data class StatsColors(
     val chipOnText: Color,     // text on the selected chip
 )
 
-fun BackdropStyle.statsColors(): StatsColors {
+fun DeckColors.statsColors(): StatsColors {
     val fg = contentColor
-    return when (this) {
+    return when (style) {
         BackdropStyle.Paper -> StatsColors(
             textPrimary = fg, textSecondary = fg.copy(alpha = 0.72f), textMuted = fg.copy(alpha = 0.5f),
             card = Color.Black.copy(alpha = 0.05f), line = Color.Black.copy(alpha = 0.12f),
@@ -116,18 +117,23 @@ fun BackdropStyle.statsColors(): StatsColors {
             accent = Color.White, series1 = Color.White, series2 = Color(0xFF4A2300),
             other = Color.White.copy(alpha = 0.45f), chipOnText = Color(0xFFB86A0C),
         )
-        // Charcoal and the album blur (cards are darker so charts read on any art).
-        else -> StatsColors(
-            textPrimary = Color(0xFFF3EFE7), textSecondary = Color(0xFFC3C2B7), textMuted = Color(0xFF9D9B92),
-            card = Color.Black.copy(alpha = if (this == BackdropStyle.AlbumBlur) 0.32f else 0.22f),
-            line = Color.White.copy(alpha = 0.16f), track = Color.White.copy(alpha = 0.1f),
-            accent = Color(0xFFC98500), series1 = Color(0xFF3987E5), series2 = Color(0xFFD95926),
-            other = Color(0xFF8D8B82), chipOnText = Color(0xFF1A1A19),
-        )
+        else -> darkStats(albumBlur = style == BackdropStyle.AlbumBlur)
     }
 }
 
-private val LocalStatsColors = staticCompositionLocalOf { BackdropStyle.Charcoal.statsColors() }
+/** The stats in the dark room, whatever the background. */
+val NightStatsColors: StatsColors = darkStats(albumBlur = false)
+
+/** Charcoal and the album blur (cards are darker so charts read on any art). */
+private fun darkStats(albumBlur: Boolean) = StatsColors(
+    textPrimary = Color(0xFFF3EFE7), textSecondary = Color(0xFFC3C2B7), textMuted = Color(0xFF9D9B92),
+    card = Color.Black.copy(alpha = if (albumBlur) 0.32f else 0.22f),
+    line = Color.White.copy(alpha = 0.16f), track = Color.White.copy(alpha = 0.1f),
+    accent = Color(0xFFC98500), series1 = Color(0xFF3987E5), series2 = Color(0xFFD95926),
+    other = Color(0xFF8D8B82), chipOnText = Color(0xFF1A1A19),
+)
+
+private val LocalStatsColors = staticCompositionLocalOf { NightStatsColors }
 
 private val TextPrimary: Color @Composable get() = LocalStatsColors.current.textPrimary
 private val TextSecondary: Color @Composable get() = LocalStatsColors.current.textSecondary
@@ -165,7 +171,7 @@ private const val REVEAL_STEPS = 6
 @Composable
 fun StatsScreen(
     history: PlayLogStore,
-    style: BackdropStyle,
+    colors: StatsColors,
     reveal: () -> Float,
     modifier: Modifier = Modifier,
 ) {
@@ -173,7 +179,6 @@ fun StatsScreen(
     val entries by history.entries.collectAsStateWithLifecycle()
     val stats = remember(entries, period) { StatsCalculator.compute(entries, period, System.currentTimeMillis()) }
     var confirmClear by remember { mutableStateOf(false) }
-    val colors = remember(style) { style.statsColors() }
 
     CompositionLocalProvider(LocalStatsColors provides colors) {
         Box(modifier.fillMaxSize()) {

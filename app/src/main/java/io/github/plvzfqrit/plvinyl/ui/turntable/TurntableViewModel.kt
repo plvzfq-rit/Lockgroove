@@ -9,7 +9,7 @@ import io.github.plvzfqrit.plvinyl.core.turntable.Deck
 import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.TurntableController
 import io.github.plvzfqrit.plvinyl.core.turntable.UserIntent
-import io.github.plvzfqrit.plvinyl.data.Look
+import io.github.plvzfqrit.plvinyl.ui.drawing.Look
 import io.github.plvzfqrit.plvinyl.data.PlayLogStore
 import io.github.plvzfqrit.plvinyl.data.Plays
 import io.github.plvzfqrit.plvinyl.data.SettingsStore

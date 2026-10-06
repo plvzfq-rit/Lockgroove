@@ -101,14 +101,16 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
-import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmColors
+import io.github.plvzfqrit.plvinyl.ui.drawing.deckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
 import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
 import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
+import io.github.plvzfqrit.plvinyl.ui.stats.NightStatsColors
 import io.github.plvzfqrit.plvinyl.ui.stats.StatsScreen
+import io.github.plvzfqrit.plvinyl.ui.stats.statsColors
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -133,6 +135,7 @@ fun TurntableScreen(
     val settings by vm.settings.collectAsStateWithLifecycle()
     val look by vm.look.collectAsStateWithLifecycle()
     val backdrop = look.backdrop
+    val deck = remember(look) { look.deckColors() }
     var showSettings by remember { mutableStateOf(false) }
     val animator = remember { TurntableAnimator() }
     val haptics = LocalHapticFeedback.current
@@ -162,7 +165,7 @@ fun TurntableScreen(
     val disc = animator.disc
     val art = disc?.let { arts[it.key] }
 
-    PhoneSettingsEffects(settings, lightRoom = backdrop.isLight && ui.roomLight.night < 0.5f, audible = ui.audible)
+    PhoneSettingsEffects(settings, lightRoom = deck.isLight && ui.roomLight.night < 0.5f, audible = ui.audible)
     // Room lighting by the clock (or always day / night, from settings).
     val roomLight = rememberRoomLight(ui.roomLight)
     SideEffect {
@@ -283,7 +286,7 @@ fun TurntableScreen(
         val spindleY = platterTop + platterRadius
         val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val panelHeight = FRONT_PANEL_HEIGHT + navInset
-        val armColors = remember(backdrop) { backdrop.tonearmColors() }
+        val armColors = deck.tonearm
 
         // The lamp hangs over the record's resting place.
         val lampCenter = with(screenDensity) { Offset(spindleX.toPx(), spindleY.toPx()) }
@@ -465,7 +468,7 @@ fun TurntableScreen(
                 held = vm.held,
                 durationMs = ui.durationMs,
                 size = disc?.size ?: RecordSize.LP,
-                light = backdrop.isLight,
+                light = deck.isLight,
                 modifier = Modifier.offset(
                     x = spindleX + (platterRadius / TurntableGeometry.PLATTER_RADIUS) * (TurntableGeometry.PIVOT_FROM_SPINDLE.x - 150f),
                     y = spindleY + (platterRadius / TurntableGeometry.PLATTER_RADIUS) * (TurntableGeometry.PIVOT_FROM_SPINDLE.y - 20f),
@@ -482,7 +485,7 @@ fun TurntableScreen(
                 // Title/artist fade to the new song. Long ones scroll (marquee).
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
-                        val text = litTextColor(backdrop.contentColor, ui.roomLight)
+                        val text = litTextColor(deck.contentColor, ui.roomLight)
                         MarqueeText(t, text, MaterialTheme.typography.headlineMedium)
                         if (a != null) {
                             MarqueeText(a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
@@ -516,7 +519,7 @@ fun TurntableScreen(
             // Dust cover over the top plate (not the front panel: that stays reachable).
             DustCover(
                 closed = coverClosed,
-                style = backdrop,
+                light = deck.isLight,
                 onOpen = { coverClosed = false },
                 night = { roomLight().night },
                 modifier = Modifier
@@ -526,7 +529,7 @@ fun TurntableScreen(
 
             if (showSettings) {
                 SettingsSheet(
-                    current = backdrop,
+                    deck = deck,
                     finish = look.finish,
                     art = art,
                     seedKey = disc?.key?.value,
@@ -546,7 +549,7 @@ fun TurntableScreen(
             // In the dark room the stats use the dark colors, whatever the background.
             StatsScreen(
                 history = vm.history,
-                style = if (ui.roomLight.night > 0.5f) BackdropStyle.Charcoal else backdrop,
+                colors = if (ui.roomLight.night > 0.5f) NightStatsColors else deck.statsColors(),
                 reveal = { PageSwipe.reveal(statsProgress.value) },
             )
         }
