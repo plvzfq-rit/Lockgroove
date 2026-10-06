@@ -1,5 +1,8 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
+import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
+import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
+import io.github.plvzfqrit.plvinyl.core.lighting.lightAt
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.Clock
 import io.github.plvzfqrit.plvinyl.core.model.Disc
@@ -84,6 +87,11 @@ class TurntableController(
     /** A cue jump (repeat): the player jumps to [ms] once the needle is up. */
     private data class CueJump(val ms: Long, val since: Long)
     private var cueJump: CueJump? = null
+
+    // ---- Room light: the clock is checked every 30 s (the ramps are half an hour long)
+    private var roomLight = RoomLight()
+    private var lightCheckedAt = Long.MIN_VALUE
+    private var lightMode: LightingMode? = null
 
     // ---- Opening and coming back
     private sealed interface Phase {
@@ -191,6 +199,12 @@ class TurntableController(
         val now = clock.nowMs()
         if (audible()) playedMs += (now - lastTick).coerceAtLeast(0L)
         lastTick = now
+        val mode = _settings.value.lighting
+        if (mode != lightMode || now - lightCheckedAt >= LIGHT_CHECK_MS) {
+            lightMode = mode
+            lightCheckedAt = now
+            roomLight = mode.lightAt(clock.minuteOfDay())
+        }
         when (val p = phase) {
             Phase.Stopped -> return
             is Phase.StartingUp -> if (song != null || now >= p.deadline) snapToPlayer()
@@ -350,6 +364,7 @@ class TurntableController(
             repeatOne = _settings.value.repeatOne,
             player = s?.player,
             learnedCrossfadeMs = s?.let { crossfade.leadFor(it.player) } ?: 0L,
+            roomLight = roomLight,
         )
     }
 
@@ -373,6 +388,8 @@ class TurntableController(
         const val ART_WAIT_MS = 1200L
         /** After dropping the needle by hand, hold it there this long while the player catches up. */
         const val DROP_HOLD_MS = 1500L
+        /** How often the room light follows the clock. */
+        const val LIGHT_CHECK_MS = 30_000L
         /** A cue jump waits at most this long for the needle to lift. */
         const val CUE_JUMP_TIMEOUT_MS = 2000L
         /** Used to creep the needle inward when the player doesn't report a length. */

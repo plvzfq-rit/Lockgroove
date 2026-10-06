@@ -1,5 +1,7 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
+import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
+
 /** Everything the screen shows, apart from the moving parts (those follow the target). */
 data class TurntableUiState(
     /** The song under the record: the player's, which can run ahead of the record. */
@@ -24,4 +26,6 @@ data class TurntableUiState(
     val player: String? = null,
     /** How early the needle lifts for this player (its learned crossfade). */
     val learnedCrossfadeMs: Long = 0L,
+    /** The light in the room right now. */
+    val roomLight: RoomLight = RoomLight(),
 )
