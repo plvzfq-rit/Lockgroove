@@ -1,10 +1,15 @@
 package io.github.plvzfqrit.plvinyl.ui.drawing
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import kotlin.math.PI
 import kotlin.math.cos
@@ -79,4 +84,15 @@ fun DrawScope.drawPlatterFelt(
         radius = sp,
         center = center,
     )
+}
+/**
+ * The platter and felt, drawn once into a bitmap per size (thousands of fibre specks
+ * would otherwise be re-drawn on every frame the record spins above them).
+ */
+fun Modifier.platterFelt(): Modifier = drawWithCache {
+    val w = size.width.toInt().coerceAtLeast(1)
+    val h = size.height.toInt().coerceAtLeast(1)
+    val baked = ImageBitmap(w, h)
+    CanvasDrawScope().draw(this, layoutDirection, Canvas(baked), size) { drawPlatterFelt() }
+    onDrawBehind { drawImage(baked) }
 }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,7 +97,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
-import io.github.plvzfqrit.plvinyl.ui.drawing.drawPlatterFelt
+import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
@@ -325,9 +326,7 @@ fun TurntableScreen(
                     .requiredSize(platterSize)
                     .shadow(elevation = 16.dp, shape = CircleShape, clip = false),
             ) {
-                Canvas(Modifier.fillMaxSize()) {
-                    drawPlatterFelt(center = center, outerRadius = size.minDimension / 2f)
-                }
+                Spacer(Modifier.fillMaxSize().platterFelt())
                 if (disc != null) {
                     VinylRecord(
                         art = art,
