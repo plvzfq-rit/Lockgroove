@@ -1,25 +1,30 @@
 package io.github.plvzfqrit.plvinyl.ui.turntable
 
 import android.app.Activity
+import android.os.Build
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -32,12 +37,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -46,14 +53,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -67,21 +78,23 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.plvzfqrit.plvinyl.core.history.Wear
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
 import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.UserIntent
+import io.github.plvzfqrit.plvinyl.core.ui.PageSwipe
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawPlatterFelt
-import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
+import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
 import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
@@ -89,8 +102,9 @@ import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
-import kotlinx.coroutines.launch
+import io.github.plvzfqrit.plvinyl.ui.stats.StatsScreen
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 /**
  * The turntable. The controller (in the view model) decides; the animator performs
@@ -148,12 +162,89 @@ fun TurntableScreen(
         animator.frameIntervalMs = settings.motion.fps.let { if (it == 0) 0L else 1000L / it }
     }
 
-    Box(modifier.fillMaxSize()) {
+    val counts by vm.history.counts.collectAsStateWithLifecycle()
+
+    // ---------------- Stats ("Liner notes") ----------------
+    // One progress value, 0 = turntable, 1 = stats (see the core's PageSwipe).
+    val statsProgress = remember { Animatable(0f) }
+    val screenDensity = LocalDensity.current
+    val statsShown by remember { derivedStateOf { statsProgress.value > 0f } }
+    // The stats only take touches once the deck has gone (before that they're invisible).
+    val statsOnScreen by remember { derivedStateOf { statsProgress.value > PageSwipe.FADE_OUT_END } }
+    fun animateStats(open: Boolean) {
+        val target = if (open) 1f else 0f
+        val ms = PageSwipe.durationMs(statsProgress.value, target)
+        scope.launch { statsProgress.animateTo(target, tween(ms, easing = LinearEasing)) }
+    }
+    BackHandler(enabled = statsShown) { animateStats(false) }
+    // While the stats cover the deck, don't spend anything redrawing the record.
+    LaunchedEffect(animator) {
+        snapshotFlow { statsProgress.value < PageSwipe.FADE_OUT_END }.collect { animator.visible = it }
+    }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            // ONE swipe for the whole page, both directions, from anywhere (except the
+            // record and the arm, which the deck takes first): left opens the stats,
+            // right goes back. Works mid-animation too: grab it and change your mind.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val startP = statsProgress.value
+                    val startedOpen = PageSwipe.startsOpen(startP)
+                    var dx = 0f
+                    val tracker = VelocityTracker()
+                    tracker.addPosition(down.uptimeMillis, down.position)
+                    val start = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+                        change.consume(); dx += over
+                    } ?: return@awaitEachGesture
+                    val w = size.width.toFloat()
+                    tracker.addPosition(start.uptimeMillis, start.position)
+                    scope.launch { statsProgress.snapTo(PageSwipe.dragged(startP, dx, w)) }
+                    horizontalDrag(start.id) { change ->
+                        dx += change.positionChange().x
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        change.consume()
+                        scope.launch { statsProgress.snapTo(PageSwipe.dragged(startP, dx, w)) }
+                    }
+                    val open = PageSwipe.settle(startedOpen, dx, tracker.calculateVelocity().x, w,
+                        PageSwipe.FLING_DP_S * screenDensity.density)
+                    if (open != startedOpen) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    animateStats(open)
+                }
+            }
+    ) {
         TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value)
         // The room's light on the background.
         RoomShade(roomLight, Modifier.fillMaxSize())
 
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    // The whole deck slides off to the left like it's going down a slope:
+                    // it tilts away and shrinks a little, and the closer it gets to the
+                    // edge, the more it blurs (slowly at first, then quickly).
+                    val out = (statsProgress.value / PageSwipe.FADE_OUT_END).coerceIn(0f, 1f)
+                    val slope = out * out
+                    translationX = -out * size.width
+                    rotationY = 22f * slope                                 // left side tips away from you
+                    cameraDistance = 12f * density
+                    transformOrigin = TransformOrigin(0f, 0.5f)
+                    scaleX = 1f - 0.12f * slope
+                    scaleY = 1f - 0.12f * slope
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        renderEffect = if (out > 0.001f && out < 1f) {
+                            val r = 2.dp.toPx() + slope * 30.dp.toPx()
+                            BlurEffect(r, r * 0.6f, TileMode.Decal)
+                        } else null
+                        alpha = if (out >= 1f) 0f else 1f
+                    } else {
+                        alpha = 1f - slope                                  // no blur before Android 12: fade
+                    }
+                }
+        ) {
             // A platter wider than the screen, bleeding off the left edge, high up.
             val platterSize = maxWidth * 1.213f
             val platterRadius = platterSize / 2
@@ -189,6 +280,7 @@ fun TurntableScreen(
                         art = art,
                         finish = look.finish,
                         grooveGlints = settings.grooveGlints,
+                        wear = if (settings.recordWear) Wear.of(counts[disc.key] ?: 0) else 0f,
                         seedKey = disc.key.value,
                         rotation = { animator.spinAngle },
                         size = disc.size,
@@ -339,9 +431,8 @@ fun TurntableScreen(
 
             // Lamp / golden-hour light on the deck: over the platter, record and arm,
             // under the title and keys (those stay readable at any hour).
-            val density = LocalDensity.current
-            val lampCenter = with(density) { Offset(spindleX.toPx(), spindleY.toPx()) }
-            val lampRadius = with(density) { platterRadius.toPx() } * (disc?.size?.radiusOfPlatter ?: RECORD_TO_PLATTER)
+            val lampCenter = with(screenDensity) { Offset(spindleX.toPx(), spindleY.toPx()) }
+            val lampRadius = with(screenDensity) { platterRadius.toPx() } * (disc?.size?.radiusOfPlatter ?: RECORD_TO_PLATTER)
             LampLight(roomLight, lampCenter, lampRadius, Modifier.fillMaxSize())
 
             // Settings: a knob under the tonearm, on the platter's baseline.
@@ -411,6 +502,16 @@ fun TurntableScreen(
                     onDismiss = { showSettings = false },
                 )
             }
+        }
+
+        if (statsOnScreen) {
+            // Pops in on the same background once the deck has gone. In the dark room
+            // the stats use the dark colors, whatever the background.
+            StatsScreen(
+                history = vm.history,
+                style = if (ui.roomLight.night > 0.5f) BackdropStyle.Charcoal else backdrop,
+                reveal = { PageSwipe.reveal(statsProgress.value) },
+            )
         }
     }
 }
