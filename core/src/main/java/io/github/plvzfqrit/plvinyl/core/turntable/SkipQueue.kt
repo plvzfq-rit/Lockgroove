@@ -29,6 +29,13 @@ class SkipQueue {
 
     private var lastFlickAt = 0L
 
+    // Skips the player hasn't answered yet (each answer is a song change). Landing
+    // waits for them: until then, the song the player shows is an old one.
+    private var unanswered = 0
+    private var lastSentAt = 0L
+    private var lastAnswerAt = 0L
+    private var lastKey: SongKey? = null
+
     /** An automatic skip decided at the end of a record: which record it was for. */
     private var runOutFor: SongKey? = null
 
@@ -63,6 +70,7 @@ class SkipQueue {
         browsing = false
         runOutFor = null
         phase = Phase.Idle
+        unanswered = 0
     }
 
     /**
@@ -72,12 +80,23 @@ class SkipQueue {
      * @param settledKey the record the turntable has settled on
      */
     fun tick(now: Long, needleUp: Boolean, key: SongKey?, positionMs: Long?, settledKey: SongKey?): List<SkipEffect> {
-        // Landed: no skips left, no new taps for a moment, AND the record has caught up
-        // with the song you're on. (Without that last check the arm headed back to the
-        // OLD record, then turned around for the new one.)
-        if (browsing && queued == 0 && phase == Phase.Idle && now - lastFlickAt >= LAND_AFTER_MS) {
+        if (key != lastKey) {
+            lastKey = key
+            lastAnswerAt = now
+            if (unanswered > 0) unanswered--
+        }
+        // A player that never answers (previous at the start of a playlist, a skip it
+        // ignores) doesn't keep the arm waiting forever.
+        if (unanswered > 0 && now - lastSentAt >= ANSWER_TIMEOUT_MS) unanswered = 0
+
+        // Landed: no skips left, no new taps for a moment, the player has answered every
+        // skip, AND the record has caught up with the song you're on. (Landing before
+        // the player answered sent the arm back to the OLD record, then the new song
+        // arrived and it turned around.)
+        if (browsing && queued == 0 && phase == Phase.Idle && unanswered == 0 && now - lastFlickAt >= LAND_AFTER_MS) {
             val caughtUp = key != null && settledKey == key
-            if (caughtUp || now - lastFlickAt >= LAND_AFTER_MS + LAND_SETTLE_TIMEOUT_MS) browsing = false
+            val quietSince = maxOf(lastFlickAt, lastSentAt, lastAnswerAt)
+            if (caughtUp || now - quietSince >= LAND_SETTLE_TIMEOUT_MS) browsing = false
         }
 
         return when (val p = phase) {
@@ -124,6 +143,8 @@ class SkipQueue {
 
     private fun send(dir: Int, before: SongKey?, now: Long): List<SkipEffect> {
         queued -= dir
+        unanswered++
+        lastSentAt = now
         phase = Phase.AwaitingChange(before, now + SKIP_WAIT_MS)
         val skip = if (dir > 0) PlayerCommand.Next else PlayerCommand.Previous
         return listOf(SkipEffect.Send(skip), SkipEffect.Silence)
@@ -132,7 +153,9 @@ class SkipQueue {
     companion object {
         /** How long after the last tap you count as "landed" on a song. */
         const val LAND_AFTER_MS = 900L
-        /** Max extra wait for the landed song to settle before playing anyway. */
+        /** Max wait for the player to answer a skip (change songs) before landing anyway. */
+        const val ANSWER_TIMEOUT_MS = 2000L
+        /** Max wait (since the last tap, skip or song change) for the record to settle. */
         const val LAND_SETTLE_TIMEOUT_MS = 2500L
         /** Max wait for the player to switch songs after each skip. */
         const val SKIP_WAIT_MS = 400L
@@ -142,8 +165,8 @@ class SkipQueue {
         const val PREVIOUS_RESTART_MS = 2000L
         /** Within this long of a song's start, the player has just moved on by itself. */
         const val RESTART_WINDOW_MS = 3000L
-        /** Max wait for the rewind to 0:00 before "previous". */
-        const val REWIND_WAIT_MS = 1000L
+        /** Max wait for the rewind to 0:00 before "previous" (too early, and it only restarts the song). */
+        const val REWIND_WAIT_MS = 2000L
         /** Pause between the rewind and "previous". */
         const val REWOUND_PAUSE_MS = 150L
     }

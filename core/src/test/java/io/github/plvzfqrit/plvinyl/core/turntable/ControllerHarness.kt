@@ -1,6 +1,7 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
 import io.github.plvzfqrit.plvinyl.core.FakeClock
+import io.github.plvzfqrit.plvinyl.core.FakePlayer
 import io.github.plvzfqrit.plvinyl.core.history.PlayCounter
 import io.github.plvzfqrit.plvinyl.core.history.PlayLog
 import io.github.plvzfqrit.plvinyl.core.history.PlaySink
@@ -9,7 +10,8 @@ import io.github.plvzfqrit.plvinyl.core.playback.PlayerCommand
 
 /**
  * A controller wired to an animator that performs every move instantly, and a
- * player that records what it was told.
+ * player that records what it was told. Give it a [player] and the commands are
+ * also acted on, with the player's delay, and its reports fed back.
  */
 class ControllerHarness {
     val clock = FakeClock()
@@ -19,7 +21,8 @@ class ControllerHarness {
         override fun countPlay(song: PlayedSong, listenedMs: Long) = log.countPlay(song, listenedMs, clock.wallMs()).first.id
         override fun updateListened(id: Long, listenedMs: Long) { log.updateListened(id, listenedMs) }
     })
-    val controller = TurntableController(clock, { commands += it }, plays)
+    var player: FakePlayer? = null
+    val controller = TurntableController(clock, { commands += it; player?.receive(it) }, plays)
     var deck = Deck(disc = null)
     val moves = ArrayList<Move>()
     private var lastSeekId = 0
@@ -49,6 +52,7 @@ class ControllerHarness {
             val d = minOf(step, left)
             clock.advance(d)
             left -= d
+            player?.let { if (it.tick()) controller.onSnapshot(it.snapshot()) }
             controller.tick()
             settleDeck()
         }

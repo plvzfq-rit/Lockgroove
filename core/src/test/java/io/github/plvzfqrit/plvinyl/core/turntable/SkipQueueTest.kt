@@ -77,10 +77,24 @@ class SkipQueueTest {
 
     @Test fun `after fast-forwarding the arm keeps holding until the new record has settled`() {
         q.flick(+1, now)
-        run(300, key = { b }, settled = { a })                     // player moved; record hasn't yet
-        run(1_500, key = { b }, settled = { a })
+        var song = a
+        run(100, key = { song }, settled = { a })                  // next goes out
+        song = b                                                   // the player moved; the record hasn't yet
+        run(1_700, key = { song }, settled = { a })
         assertTrue(q.browsing)
         run(100, key = { b }, settled = { b })
+        assertFalse(q.browsing)
+    }
+
+    @Test fun `the arm doesn't land while the player hasn't answered the skip yet`() {
+        q.flick(+1, now)
+        run(1_500, key = { a }, settled = { a })                   // the player is slow to switch
+        assertTrue(q.browsing, "landed on the song we skipped away from")
+    }
+
+    @Test fun `a skip the player never answers stops holding the arm after a while`() {
+        q.flick(-1, now)                                           // start of the playlist: nothing to go back to
+        run(5_000, key = { a }, position = { 0L }, settled = { a })
         assertFalse(q.browsing)
     }
 
