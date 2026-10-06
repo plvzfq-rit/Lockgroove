@@ -4,7 +4,6 @@ import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.Clock
 import io.github.plvzfqrit.plvinyl.core.model.Disc
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
-import io.github.plvzfqrit.plvinyl.core.model.RecordSizeChoice
 import io.github.plvzfqrit.plvinyl.core.model.SongKey
 import io.github.plvzfqrit.plvinyl.core.model.sizeFor
 import io.github.plvzfqrit.plvinyl.core.playback.CrossfadeLearner
@@ -12,6 +11,7 @@ import io.github.plvzfqrit.plvinyl.core.playback.PlaybackArbiter
 import io.github.plvzfqrit.plvinyl.core.playback.PlayerCommand
 import io.github.plvzfqrit.plvinyl.core.playback.PlayerSnapshot
 import io.github.plvzfqrit.plvinyl.core.playback.PositionTracker
+import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +32,12 @@ class TurntableController(
     private val arbiter = PlaybackArbiter(clock)
     private val skips = SkipQueue()
     private val end = EndOfRecord()
-    private val crossfade = CrossfadeLearner()
+    private var crossfade = CrossfadeLearner()
+
+    private val _settings = MutableStateFlow(Settings())
+
+    /** The settings, including what the controller changes itself (↻1, learned crossfades). */
+    val settings: StateFlow<Settings> = _settings.asStateFlow()
 
     private val _target = MutableStateFlow(TurntableTarget())
 
@@ -42,16 +47,16 @@ class TurntableController(
     private val _ui = MutableStateFlow(TurntableUiState())
     val ui: StateFlow<TurntableUiState> = _ui.asStateFlow()
 
-    /** The app's own repeat one (the ↻1 key). */
-    var repeatOne = false
-        set(value) { field = value; refresh() }
+    /** Change the settings (from the settings sheet, or loaded from storage). */
+    fun updateSettings(change: (Settings) -> Settings) {
+        val next = change(_settings.value)
+        if (next.learnedCrossfades != crossfade.learned) crossfade = CrossfadeLearner(next.learnedCrossfades)
+        _settings.value = next
+        refresh()
+    }
 
-    /** How long before the end the needle lifts (margin against auto-advance). */
-    var endMarginMs = 1000L
-
-    /** 7" or 12", from the song length (a setting). */
-    var recordSizeChoice: RecordSizeChoice = RecordSizeChoice.Auto
-        set(value) { field = value; refresh() }
+    /** Forget the crossfade learned for [player]. */
+    fun forgetCrossfade(player: String) = updateSettings { it.copy(learnedCrossfades = it.learnedCrossfades - player) }
 
     // ---- What we know
     private var song: PlayerSnapshot? = null
@@ -99,9 +104,9 @@ class TurntableController(
         if (prev != null && s != null && PositionTracker.isSeek(prev, s)) seekId++
         // The song changed by itself while the needle was on it, a few seconds early:
         // the player's crossfade. Lift that much sooner next time.
-        if (prev != null && s != null) {
-            crossfade.observe(prev, s, needleWasOnPrev = needleOn == prev.key,
-                flicking = skips.browsing || skips.queued != 0, now = clock.nowMs())
+        if (prev != null && s != null && crossfade.observe(prev, s, needleWasOnPrev = needleOn == prev.key,
+                flicking = skips.browsing || skips.queued != 0, now = clock.nowMs())) {
+            _settings.value = _settings.value.copy(learnedCrossfades = crossfade.learned)
         }
         if (s?.key != prev?.key) playedMs = 0L
         song = s
@@ -151,7 +156,7 @@ class TurntableController(
                     arbiter.wantPlaying = needleOn == null
                 }
             }
-            UserIntent.ToggleRepeat -> repeatOne = !repeatOne
+            UserIntent.ToggleRepeat -> _settings.value = _settings.value.copy(repeatOne = !_settings.value.repeatOne)
             is UserIntent.Flick -> skips.flick(intent.dir, clock.nowMs())
             is UserIntent.HoldArm -> grabAngle = intent.angleDeg
             UserIntent.LetGoOfArm -> letGoOfArm()
@@ -204,8 +209,9 @@ class TurntableController(
             val s = song
             val ending = end.tick(
                 now, s, needleOn, audible(), browsing = skips.browsing, wantPlaying = arbiter.wantPlaying,
-                grabbing = grabAngle != null, leadMs = endMarginMs + (s?.let { crossfade.leadFor(it.player) } ?: 0L),
-                repeatOne = repeatOne,
+                grabbing = grabAngle != null,
+                leadMs = _settings.value.endMargin.ms + (s?.let { crossfade.leadFor(it.player) } ?: 0L),
+                repeatOne = _settings.value.repeatOne,
             )
             when (ending) {
                 EndEffect.EnterLeadOut -> sendAll(arbiter.enterLeadOut())
@@ -286,7 +292,7 @@ class TurntableController(
     }
 
     private fun discFor(s: PlayerSnapshot?): Disc? =
-        s?.let { Disc(it.key, recordSizeChoice.sizeFor(it.durationMs), it.title, it.artist, it.hasArt) }
+        s?.let { Disc(it.key, _settings.value.recordSize.sizeFor(it.durationMs), it.title, it.artist, it.hasArt) }
 
     private fun audible(): Boolean {
         val s = song ?: return false
@@ -341,7 +347,9 @@ class TurntableController(
             browsing = skips.browsing,
             inLeadOut = end.inLeadOut,
             grabAngle = grabAngle,
-            repeatOne = repeatOne,
+            repeatOne = _settings.value.repeatOne,
+            player = s?.player,
+            learnedCrossfadeMs = s?.let { crossfade.leadFor(it.player) } ?: 0L,
         )
     }
 

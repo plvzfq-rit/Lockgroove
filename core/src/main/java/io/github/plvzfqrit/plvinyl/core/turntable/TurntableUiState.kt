@@ -20,4 +20,8 @@ data class TurntableUiState(
     val inLeadOut: Boolean = false,
     /** ↻1 is on (the key's light). */
     val repeatOne: Boolean = false,
+    /** The playing app (package name). */
+    val player: String? = null,
+    /** How early the needle lifts for this player (its learned crossfade). */
+    val learnedCrossfadeMs: Long = 0L,
 )

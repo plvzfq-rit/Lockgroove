@@ -74,8 +74,9 @@ class FrontPanelKeysTest {
         assertEquals(PlayerCommand.Play, h.commands.last())
     }
 
-    @Test fun `repeat one lights the key`() {
+    @Test fun `repeat one is saved in the settings and lights the key`() {
         c.onIntent(UserIntent.ToggleRepeat)
+        assertTrue(c.settings.value.repeatOne)
         assertTrue(c.ui.value.repeatOne)
         c.onIntent(UserIntent.ToggleRepeat)
         assertFalse(c.ui.value.repeatOne)

@@ -46,7 +46,7 @@ class EndOfRecordTest {
     }
 
     @Test fun `with repeat one the arm goes back to the start without parking`() {
-        c.repeatOne = true
+        c.updateSettings { it.copy(repeatOne = true) }
         nearTheEnd()
         h.run(9_300)
         playerPaused()
@@ -84,5 +84,7 @@ class EndOfRecordTest {
         h.commands.clear()
         h.run(1_100)                                                 // ~4 s left: inside 1 s + 3 s
         assertTrue(c.ui.value.inLeadOut, "didn't lift early: ${h.commands}")
+        val learned = c.settings.value.learnedCrossfades["com.spotify.music"] ?: 0L
+        assertTrue(learned in 2_500L..3_000L, "learned $learned ms")              // saved with the settings
     }
 }
