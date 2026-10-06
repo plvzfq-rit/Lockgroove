@@ -13,6 +13,8 @@ kotlin {
 }
 
 dependencies {
+    api(libs.kotlinx.coroutines.core)          // StateFlow is part of the controller's API
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
