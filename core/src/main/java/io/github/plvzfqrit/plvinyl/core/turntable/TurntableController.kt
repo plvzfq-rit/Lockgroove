@@ -29,6 +29,7 @@ class TurntableController(
     private val send: (PlayerCommand) -> Unit,
 ) {
     private val arbiter = PlaybackArbiter(clock)
+    private val skips = SkipQueue()
 
     private val _target = MutableStateFlow(TurntableTarget())
 
@@ -135,6 +136,7 @@ class TurntableController(
                 }
             }
             UserIntent.ToggleRepeat -> repeatOne = !repeatOne
+            is UserIntent.Flick -> skips.flick(intent.dir, clock.nowMs())
             is UserIntent.HoldArm -> grabAngle = intent.angleDeg
             UserIntent.LetGoOfArm -> letGoOfArm()
         }
@@ -171,12 +173,24 @@ class TurntableController(
             Phase.Stopped -> return
             is Phase.StartingUp -> if (song != null || now >= p.deadline) snapToPlayer()
             is Phase.Resuming -> if (now >= p.at) {
+                skips.reset()
                 grabAngle = null
                 dropAngle = null
                 parkWhenPaused = false
                 snapToPlayer()
             }
             Phase.Running -> {}
+        }
+        if (phase == Phase.Running) {
+            val s = song
+            val effects = skips.tick(
+                now, needleUp = needleOn == null, key = s?.key,
+                positionMs = s?.let { PositionTracker.positionAt(it, now) }, settledKey = settled?.key,
+            )
+            for (e in effects) when (e) {
+                is SkipEffect.Send -> send(e.command)
+                SkipEffect.Silence -> sendAll(arbiter.silence())
+            }
         }
         sendAll(arbiter.onTick())
         refresh()
@@ -256,6 +270,8 @@ class TurntableController(
                 disc = settled,
                 playing = arbiter.wantPlaying,
                 playAngle = playAngle(now),
+                // While flicking, the arm parks and waits: no swap until you land.
+                holdArm = skips.browsing,
                 seekId = seekId,
                 grabAngle = grabAngle,
                 parkWhenPaused = parkWhenPaused,
@@ -268,7 +284,8 @@ class TurntableController(
             durationMs = s?.durationMs ?: 0L,
             playing = arbiter.wantPlaying,
             audible = audible(),
-            canGrab = settled != null,
+            canGrab = settled != null && !skips.browsing,
+            browsing = skips.browsing,
             grabAngle = grabAngle,
             repeatOne = repeatOne,
         )

@@ -86,4 +86,24 @@ class TurntableControllerTest {
         assertTrue(h.deck.armParked && h.deck.armDown)
         assertEquals(false, c.ui.value.playing)
     }
+
+    @Test fun `flicking lifts the needle once, skips silently, and plays the song you land on`() {
+        c.onSnapshot(playing("Song A"))
+        c.onStart()
+        h.run(500)
+        h.commands.clear()
+        c.onIntent(UserIntent.Flick(+1))
+        c.onIntent(UserIntent.Flick(+1))
+        h.run(300)
+        assertTrue(h.deck.armParked, "arm not parked while flicking")
+        c.onSnapshot(playing("Song B", positionMs = 0))
+        h.run(300)
+        c.onSnapshot(playing("Song C", positionMs = 0))
+        h.run(4_000)
+        val nexts = h.commands.count { it == PlayerCommand.Next }
+        assertEquals(2, nexts)
+        assertEquals(playing("Song C").key, h.deck.disc?.key)
+        assertEquals(playing("Song C").key, h.deck.needleOn)
+        assertEquals(PlayerCommand.Play, h.commands.last())
+    }
 }
