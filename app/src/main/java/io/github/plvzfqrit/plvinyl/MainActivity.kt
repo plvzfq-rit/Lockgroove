@@ -4,14 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import io.github.plvzfqrit.plvinyl.core.model.RecordSize
+import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
+import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.theme.PLVinylTheme
+import io.github.plvzfqrit.plvinyl.ui.turntable.TurntableScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,29 +16,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PLVinylTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                // Hard-coded until the controller exists (migration step 4).
+                TurntableScreen(
+                    backdrop = BackdropStyle.Charcoal,
+                    finish = VinylFinish.Black,
+                    record = RecordSize.LP,
+                    seedKey = "PLVinyl|plvzfqrit",
+                    title = "PLVinyl",
+                    artist = "plvzfqrit",
+                    art = null,
+                    armAngleDeg = RecordSize.LP.playingAngle(0.3f),
+                    armLift = 0f,
+                )
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    PLVinylTheme {
-        Greeting("Android")
     }
 }
