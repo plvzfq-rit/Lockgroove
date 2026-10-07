@@ -112,6 +112,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.Look
 import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
+import io.github.plvzfqrit.plvinyl.ui.drawing.TonearmGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
 import io.github.plvzfqrit.plvinyl.ui.drawing.deckColors
@@ -431,6 +432,17 @@ fun TurntableScreen(
             // plays from. Let go off the record and it goes back to rest.
             // Swipe the record itself to change songs: ← next, → previous.
             val latestUi by rememberUpdatedState(ui)
+            // While a song plays, the needle creeps along the groove at well under a pixel a
+            // second. Drawn at the nearest quarter pixel (at the needle), the arm repaints a
+            // few times a second instead of every frame. Swings and drags still move it every
+            // frame. (Touches use the exact angle.)
+            val armStepDeg = with(screenDensity) {
+                val stylusPx = TonearmGeometry.stylusTip.getDistance() * platterRadius.toPx() / TurntableGeometry.PLATTER_RADIUS
+                Math.toDegrees(0.25 / stylusPx).toFloat()
+            }
+            val drawnArmDeg by remember(armStepDeg) {
+                derivedStateOf { (animator.armAngle.value / armStepDeg).roundToInt() * armStepDeg }
+            }
             Canvas(
                 Modifier
                     .fillMaxSize()
@@ -509,7 +521,7 @@ fun TurntableScreen(
                 drawTonearmArmForPlatter(
                     spindle = Offset(spindleX.toPx(), spindleY.toPx()),
                     platterRadiusPx = platterRadius.toPx(),
-                    armAngleDeg = animator.armAngle.value,
+                    armAngleDeg = drawnArmDeg,
                     lift = animator.armLift.value,
                     colors = armColors,
                     shadow = roomLight().shadow(),
