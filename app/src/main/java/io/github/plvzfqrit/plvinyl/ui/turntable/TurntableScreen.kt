@@ -114,6 +114,7 @@ import io.github.plvzfqrit.plvinyl.ui.lighting.lightFrom
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
 import io.github.plvzfqrit.plvinyl.ui.lighting.shadow
+import io.github.plvzfqrit.plvinyl.ui.lighting.timeOfDayLabel
 import io.github.plvzfqrit.plvinyl.ui.paint.PaintCard
 import io.github.plvzfqrit.plvinyl.ui.paint.PaintTarget
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
@@ -611,7 +612,7 @@ fun TurntableScreen(
         // While a sped-up day plays: what time it is in it.
         ui.previewMinute?.let { minute ->
             Text(
-                text = clockLabel(minute),
+                text = timeOfDayLabel(minute),
                 color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -762,14 +763,6 @@ private fun HeldLabel(
             .background((if (light) Color(0xFFF5F2ED) else Color(0xFF303030)).copy(alpha = 0.92f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )
-}
-
-/** "6:40 am" for a time of day in minutes. */
-private fun clockLabel(minute: Float): String {
-    val m = minute.toInt().mod(1440)
-    val h = m / 60
-    val h12 = if (h % 12 == 0) 12 else h % 12
-    return "%d:%02d %s".format(h12, m % 60, if (h < 12) "am" else "pm")
 }
 
 /** m:ss */

@@ -18,10 +18,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -30,6 +34,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,31 +44,36 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.plvzfqrit.plvinyl.AndroidClock
 import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
+import io.github.plvzfqrit.plvinyl.core.lighting.ZonePlaces
+import io.github.plvzfqrit.plvinyl.core.lighting.sunLight
+import io.github.plvzfqrit.plvinyl.core.look.Paint
 import io.github.plvzfqrit.plvinyl.core.model.RecordSizeChoice
 import io.github.plvzfqrit.plvinyl.core.settings.EndMargin
 import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.settings.SpinSpeed
 import io.github.plvzfqrit.plvinyl.core.settings.SurfaceNoiseLevel
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material3.Icon
-import androidx.compose.ui.graphics.toArgb
-import io.github.plvzfqrit.plvinyl.core.look.Paint
+import io.github.plvzfqrit.plvinyl.ui.common.GradientSlider
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.rememberFinishPreview
+import io.github.plvzfqrit.plvinyl.ui.lighting.skyColor
+import io.github.plvzfqrit.plvinyl.ui.lighting.timeOfDayLabel
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -212,7 +222,7 @@ fun SettingsSheet(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = when (settings.lighting) {
-                        LightingMode.Clock -> "Follows the sun where your phone's time zone says you are (no location used): a soft glow at sunrise, golden hour before sunset, a desk lamp after dark."
+                        LightingMode.Clock -> "Follows the sun where your phone's time zone says you are (no location used): a soft glow at sunrise, golden hour before sunset, a desk lamp after dark. Or hold it at any time of day below."
                         LightingMode.Day -> "Always soft daylight."
                         LightingMode.Golden -> "Always golden hour: warm, low sun from the left."
                         LightingMode.Night -> "Always the desk lamp in a dark room."
@@ -221,6 +231,10 @@ fun SettingsSheet(
                     fontSize = 12.sp,
                     color = fg.copy(alpha = 0.6f),
                 )
+                if (settings.lighting == LightingMode.Clock) {
+                    Spacer(Modifier.height(12.dp))
+                    SunTimeRow(settings.sunTime, fg, tick) { onSettings(settings.copy(sunTime = it)) }
+                }
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = "Watch a day go by",
@@ -352,6 +366,54 @@ fun SettingsSheet(
             } }
         }
     }
+}
+
+/**
+ * Hold the sun at a time of day, or follow the clock (Now). The track is today's sky
+ * where you are: dark until sunrise, peach at dawn, daylight, gold before sunset.
+ */
+@Composable
+private fun SunTimeRow(held: Int?, fg: Color, tick: () -> Unit, onHold: (Int?) -> Unit) {
+    val now = AndroidClock.minuteOfDay()
+    val sky = remember {
+        val place = ZonePlaces.forZone(AndroidClock.zoneId(), AndroidClock.utcOffsetMs())
+        val midnight = AndroidClock.wallMs() - (now * 60_000).toLong()
+        List(49) { i ->
+            val minute = i * 30f
+            sunLight(midnight + (minute * 60_000).toLong(), minute, place).skyColor()
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Time of day", fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Text(
+            text = timeOfDayLabel(held?.toFloat() ?: now),
+            fontSize = 13.sp,
+            color = fg.copy(alpha = 0.7f),
+        )
+        Spacer(Modifier.width(10.dp))
+        val on = held == null
+        Text(
+            text = "Now",
+            fontSize = 13.sp,
+            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (on) (if (fg.luminance() > 0.5f) Color(0xFF242424) else Color.White) else fg,
+            modifier = Modifier
+                .semantics { selected = on }
+                .clip(RoundedCornerShape(50))
+                .background(if (on) fg else Color.Transparent)
+                .border(1.dp, fg.copy(alpha = if (on) 1f else 0.3f), RoundedCornerShape(50))
+                .clickable(role = Role.RadioButton) { tick(); onHold(null) }
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+        )
+    }
+    GradientSlider(
+        value = (held?.toFloat() ?: now) / 1440f,
+        // Five-minute steps, like a clock you'd set.
+        onValueChange = { v -> onHold(((v * 1440f).roundToInt() / 5 * 5).coerceIn(0, 1435)) },
+        stops = sky,
+        label = "Time of day",
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

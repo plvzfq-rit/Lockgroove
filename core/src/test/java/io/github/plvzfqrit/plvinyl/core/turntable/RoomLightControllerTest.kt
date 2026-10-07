@@ -74,4 +74,28 @@ class RoomLightControllerTest {
         val m = c.ui.value.previewMinute
         assertTrue(m != null && kotlin.math.abs(m - 12 * 60f) < 30f, "minute $m")
     }
+
+    @Test fun `holding the sun at a time of day shows that hour, today, and Now lets go`() {
+        h.clock.zone = "Africa/Accra"
+        h.clock.wall = day + 12 * 3_600_000L                       // noon, for real
+        h.clock.minute = 12 * 60f
+        c.onStart()
+        h.run(200)
+        assertEquals(0f, c.ui.value.roomLight.night)
+        c.updateSettings { it.copy(sunTime = 22 * 60) }           // hold it at 10 pm
+        h.run(200)                                                 // applies at once, not after 30 s
+        assertEquals(1f, c.ui.value.roomLight.night)
+        h.run(60_000)                                              // and stays there
+        assertEquals(1f, c.ui.value.roomLight.night)
+        c.updateSettings { it.copy(sunTime = null) }               // Now
+        h.run(200)
+        assertEquals(0f, c.ui.value.roomLight.night)
+    }
+
+    @Test fun `a held time only applies to the Sun lighting`() {
+        c.onStart()
+        c.updateSettings { it.copy(lighting = LightingMode.Day, sunTime = 22 * 60) }
+        h.run(200)
+        assertEquals(RoomLight(), c.ui.value.roomLight)
+    }
 }

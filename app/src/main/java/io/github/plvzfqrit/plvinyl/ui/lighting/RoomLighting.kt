@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import kotlinx.coroutines.launch
@@ -186,6 +187,22 @@ private fun DrawScope.drawSideLight(from: Float, vararg stops: Pair<Float, Color
     val reach = (abs(dx) * size.width + abs(dy) * size.height) / 2f
     val toLight = Offset(dx * reach, dy * reach)
     drawRect(Brush.linearGradient(*stops, start = center + toLight, end = center - toLight))
+}
+
+/** The sky's color in this light: pale daylight, peach at dawn, gold before sunset, night blue. */
+fun RoomLight.skyColor(): Color {
+    var c = lerp(Color(0xFFE8E2D4), Color(0xFFF2A24A), golden)
+    c = lerp(c, Color(0xFFF6C3A0), dawn)
+    c = lerp(c, Color(0xFF1C2333), night)
+    return lerp(c, Color(0xFF0E1119), late * 0.6f)
+}
+
+/** "6:40 am" for a time of day in minutes. */
+fun timeOfDayLabel(minute: Float): String {
+    val m = minute.toInt().mod(1440)
+    val h = m / 60
+    val h12 = if (h % 12 == 0) 12 else h % 12
+    return "%d:%02d %s".format(h12, m % 60, if (h < 12) "am" else "pm")
 }
 
 /** Title color: the background's text color by day, warm cream under the lamp. */

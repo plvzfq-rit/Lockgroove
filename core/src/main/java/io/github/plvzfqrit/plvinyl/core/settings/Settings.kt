@@ -46,6 +46,11 @@ data class Settings(
     val repeatOne: Boolean = false,
     /** Room lighting: follows the clock, or always one time of day. */
     val lighting: LightingMode = LightingMode.Clock,
+    /**
+     * With the Sun lighting: hold the sun at this time of day (minutes after midnight),
+     * today's sun where you are. Null = follow the clock.
+     */
+    val sunTime: Int? = null,
     val endMargin: EndMargin = EndMargin.Normal,
     /** 7" singles for short songs, 12" LPs for long ones (or always one size). */
     val recordSize: RecordSizeChoice = RecordSizeChoice.Auto,

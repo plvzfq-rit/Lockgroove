@@ -105,6 +105,7 @@ class TurntableController(
     private var roomLight = RoomLight()
     private var lightCheckedAt = Long.MIN_VALUE
     private var lightMode: LightingMode? = null
+    private var lightHeldAt: Int? = null
 
     // ---- "Watch a day go by": the sun through 24 hours in a few seconds
     private var previewStartedAt: Long? = null
@@ -247,12 +248,20 @@ class TurntableController(
             previewMinute = minute
             val place = ZonePlaces.forZone(clock.zoneId(), clock.utcOffsetMs())
             roomLight = LightingMode.Clock.lightAt(wall, minute, place)
-        } else if (mode != lightMode || now - lightCheckedAt >= LIGHT_CHECK_MS) {
+        } else if (mode != lightMode || _settings.value.sunTime != lightHeldAt || now - lightCheckedAt >= LIGHT_CHECK_MS) {
             lightMode = mode
+            lightHeldAt = _settings.value.sunTime
             lightCheckedAt = now
             // Where the sun is comes from the phone's time zone (re-read: you may have travelled).
             val place = ZonePlaces.forZone(clock.zoneId(), clock.utcOffsetMs())
-            roomLight = mode.lightAt(clock.wallMs(), clock.minuteOfDay(), place)
+            val held = lightHeldAt
+            roomLight = if (mode == LightingMode.Clock && held != null) {
+                // Held at a time of day: today's sun at that hour, where you are.
+                val midnight = clock.wallMs() - (clock.minuteOfDay() * 60_000).toLong()
+                mode.lightAt(midnight + held * 60_000L, held.toFloat(), place)
+            } else {
+                mode.lightAt(clock.wallMs(), clock.minuteOfDay(), place)
+            }
         }
         when (val p = phase) {
             Phase.Stopped -> return

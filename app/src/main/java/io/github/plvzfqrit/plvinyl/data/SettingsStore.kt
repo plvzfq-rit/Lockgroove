@@ -30,6 +30,7 @@ class SettingsStore(context: Context) {
             haptics = p[HAPTICS] ?: d.haptics,
             repeatOne = p[REPEAT_ONE] ?: d.repeatOne,
             lighting = enumOr(p[LIGHTING], d.lighting),
+            sunTime = p[SUN_TIME],
             endMargin = enumOr(p[END_MARGIN], d.endMargin),
             recordSize = enumOr(p[RECORD_SIZE], d.recordSize),
             dustCover = p[DUST_COVER] ?: d.dustCover,
@@ -62,6 +63,7 @@ class SettingsStore(context: Context) {
             p[HAPTICS] = s.haptics
             p[REPEAT_ONE] = s.repeatOne
             p[LIGHTING] = s.lighting.name
+            s.sunTime?.let { p[SUN_TIME] = it } ?: p.remove(SUN_TIME)
             p[END_MARGIN] = s.endMargin.name
             p[RECORD_SIZE] = s.recordSize.name
             p[DUST_COVER] = s.dustCover
@@ -96,6 +98,7 @@ class SettingsStore(context: Context) {
         val HAPTICS = booleanPreferencesKey("haptics")
         val REPEAT_ONE = booleanPreferencesKey("repeat_one")
         val LIGHTING = stringPreferencesKey("lighting")
+        val SUN_TIME = intPreferencesKey("sun_time")
         val END_MARGIN = stringPreferencesKey("end_margin")
         val RECORD_SIZE = stringPreferencesKey("record_size")
         val DUST_COVER = booleanPreferencesKey("dust_cover")
