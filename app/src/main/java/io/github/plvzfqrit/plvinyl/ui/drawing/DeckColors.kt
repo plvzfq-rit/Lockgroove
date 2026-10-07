@@ -10,6 +10,8 @@ data class Look(
     val finish: VinylFinish = VinylFinish.Black,
     /** The painted deck color (ARGB) for the Custom background; null = never painted. */
     val deckPaint: Int? = null,
+    /** The painted front panel (ARGB), on any background; null = match the background. */
+    val panelPaint: Int? = null,
 ) {
     /** The deck paint to use or start from: the saved one, else the current background's color. */
     val deckPaintOrSeed: Int get() = deckPaint ?: backdrop.baseColor
@@ -40,8 +42,8 @@ fun Look.deckColors(): DeckColors {
             contentColor = Color(Paint.textOn(paint)),
             isLight = light,
             tonearm = paintedTonearm(paint, light),
-            // The plinth's front edge, in its own shade.
-            panelPaint = Color(Paint.shade(paint, -0.12f)),
+            // Matching: the plinth's front edge, in its own shade.
+            panelPaint = Color(panelPaint ?: Paint.shade(paint, -0.12f)),
         )
     }
     val light = backdrop == BackdropStyle.Paper
@@ -51,7 +53,7 @@ fun Look.deckColors(): DeckColors {
         contentColor = if (light) Color(0xFF2B2A28) else Color.White,
         isLight = light,
         tonearm = backdrop.tonearmColors(),
-        panelPaint = null,
+        panelPaint = panelPaint?.let(::Color),
     )
 }
 

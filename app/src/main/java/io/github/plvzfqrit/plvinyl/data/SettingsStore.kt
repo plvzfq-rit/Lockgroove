@@ -49,6 +49,7 @@ class SettingsStore(context: Context) {
             backdrop = enumOr(p[BACKDROP], Look().backdrop),
             finish = enumOr(p[FINISH], Look().finish),
             deckPaint = p[DECK_PAINT],
+            panelPaint = p[PANEL_PAINT],
         )
     }
 
@@ -76,6 +77,7 @@ class SettingsStore(context: Context) {
             p[BACKDROP] = look.backdrop.name
             p[FINISH] = look.finish.name
             look.deckPaint?.let { p[DECK_PAINT] = it } ?: p.remove(DECK_PAINT)
+            look.panelPaint?.let { p[PANEL_PAINT] = it } ?: p.remove(PANEL_PAINT)
         }
     }
 
@@ -86,6 +88,7 @@ class SettingsStore(context: Context) {
         val BACKDROP = stringPreferencesKey("backdrop")
         val FINISH = stringPreferencesKey("finish")
         val DECK_PAINT = intPreferencesKey("deck_paint")
+        val PANEL_PAINT = intPreferencesKey("panel_paint")
         val SPIN = stringPreferencesKey("spin")
         val GLINTS = booleanPreferencesKey("groove_glints")
         val MOTION = stringPreferencesKey("motion")
