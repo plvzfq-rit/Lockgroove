@@ -1,10 +1,13 @@
-# PLVinyl
+# Lockgroove
 
 Whatever you're playing in Spotify, YouTube Music or any other player, shown as a record
 on a turntable. The needle drives the music: lift the arm and the song pauses, drop it
 anywhere on the record and it plays from there.
 
 No ads, no account, no internet permission. Everything stays on your phone.
+
+It's named after the locked groove: the endless loop at the very end of a record, where
+the needle goes round and round until someone lifts it.
 
 <p align="center">
   <img src="docs/screenshots/golden-walnut.jpg" width="32%" alt="A record playing on the walnut deck at golden hour">
@@ -118,7 +121,7 @@ YouTube (the video app) only shares what's playing with Premium; YouTube Music w
 
 ## Made with Claude
 
-I made PLVinyl with [Claude](https://claude.ai), Anthropic's AI assistant, as a pair
+I made Lockgroove with [Claude](https://claude.ai), Anthropic's AI assistant, as a pair
 programmer. On the first version it was my tutor while I learned Kotlin and Android. For
 this rewrite I wrote the plan, made the design calls and tested every build on my phone,
 and Claude wrote most of the code to match.
@@ -134,7 +137,7 @@ and Claude wrote most of the code to match.
 
 Copyright © 2026 James Christian Ruiz.
 
-PLVinyl is free software under the [GNU General Public License v3.0](LICENSE): you can
+Lockgroove is free software under the [GNU General Public License v3.0](LICENSE): you can
 use it, change it and share it, and if you share a changed version, its source has to be
 shared under the same license. The wood photos (CC0) and the tz database's places
 (public domain) keep their own terms; see Credits.

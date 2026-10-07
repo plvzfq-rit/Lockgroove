@@ -29,7 +29,7 @@ SCAN_WIDTH_M = 1.0                  # both scans show a metre of veneer
 
 
 def fetch(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "PLVinyl tools/make_wood.py"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Lockgroove tools/make_wood.py"})
     with urllib.request.urlopen(req) as r:
         return r.read()
 

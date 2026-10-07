@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# How hard PLVinyl works the phone over a minute: frames drawn per second, the app's
+# How hard Lockgroove works the phone over a minute: frames drawn per second, the app's
 # CPU use (all its threads), and the phone's temperatures.
 #
 # Plug the phone in (USB debugging on), leave the app in the state to measure (playing
@@ -10,11 +10,11 @@
 # Compare runs before and after a change, in the same state.
 set -euo pipefail
 
-PKG=io.github.plvzfqrit.plvinyl
+PKG=io.github.plvzfqrit.lockgroove
 SECS=${1:-60}
 
 pid=$(adb shell pidof "$PKG" | tr -d '\r')
-[ -n "$pid" ] || { echo "PLVinyl isn't running on the phone." >&2; exit 1; }
+[ -n "$pid" ] || { echo "Lockgroove isn't running on the phone." >&2; exit 1; }
 hz=$(adb shell getconf CLK_TCK 2>/dev/null | tr -d '\r' || true)
 hz=${hz:-100}
 

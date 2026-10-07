@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "io.github.plvzfqrit.plvinyl"
+    namespace = "io.github.plvzfqrit.lockgroove"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "io.github.plvzfqrit.plvinyl"
+        applicationId = "io.github.plvzfqrit.lockgroove"
         minSdk = 24
         targetSdk = 37
         versionCode = 1

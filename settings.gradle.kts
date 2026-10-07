@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PLVinyl"
+rootProject.name = "Lockgroove"
 include(":app")
 include(":core")
