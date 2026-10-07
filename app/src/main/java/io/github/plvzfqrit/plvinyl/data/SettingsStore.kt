@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -44,7 +45,11 @@ class SettingsStore(context: Context) {
     }
 
     val look: Flow<Look> = store.data.map { p ->
-        Look(backdrop = enumOr(p[BACKDROP], Look().backdrop), finish = enumOr(p[FINISH], Look().finish))
+        Look(
+            backdrop = enumOr(p[BACKDROP], Look().backdrop),
+            finish = enumOr(p[FINISH], Look().finish),
+            deckPaint = p[DECK_PAINT],
+        )
     }
 
     suspend fun save(s: Settings) {
@@ -70,6 +75,7 @@ class SettingsStore(context: Context) {
         store.edit { p ->
             p[BACKDROP] = look.backdrop.name
             p[FINISH] = look.finish.name
+            look.deckPaint?.let { p[DECK_PAINT] = it } ?: p.remove(DECK_PAINT)
         }
     }
 
@@ -79,6 +85,7 @@ class SettingsStore(context: Context) {
     private companion object {
         val BACKDROP = stringPreferencesKey("backdrop")
         val FINISH = stringPreferencesKey("finish")
+        val DECK_PAINT = intPreferencesKey("deck_paint")
         val SPIN = stringPreferencesKey("spin")
         val GLINTS = booleanPreferencesKey("groove_glints")
         val MOTION = stringPreferencesKey("motion")

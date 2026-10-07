@@ -294,7 +294,7 @@ fun TurntableScreen(
         // How far the deck has slid away for the stats, 0..1.
         val deckOut = { (statsProgress.value / PageSwipe.FADE_OUT_END).coerceIn(0f, 1f) }
 
-        TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value)
+        TurntableBackdrop(style = backdrop, art = art, artKey = disc?.key?.value, deckPaint = deck.deck)
         // The room's light on the background.
         RoomShade(roomLight, Modifier.fillMaxSize())
 
@@ -503,6 +503,7 @@ fun TurntableScreen(
             FrontPanel(
                 style = backdrop,
                 albumPalette = panelPalette,
+                paint = deck.panelPaint,
                 playing = ui.playing,
                 repeatOne = ui.repeatOne,
                 light = roomLight,
@@ -530,12 +531,14 @@ fun TurntableScreen(
             if (showSettings) {
                 SettingsSheet(
                     deck = deck,
+                    deckPaint = Color(look.deckPaintOrSeed),
                     finish = look.finish,
                     art = art,
                     seedKey = disc?.key?.value,
                     settings = settings,
                     learnedCrossfadeMs = ui.learnedCrossfadeMs,
-                    onSelect = { vm.setLook(look.copy(backdrop = it)) },
+                    // Going Custom keeps the paint (or starts from the current background's color).
+                    onSelect = { vm.setLook(look.copy(backdrop = it, deckPaint = look.deckPaintOrSeed)) },
                     onSelectFinish = { vm.setLook(look.copy(finish = it)) },
                     onSettings = { new -> vm.updateSettings { new } },
                     onResetCrossfade = { ui.player?.let(vm::forgetCrossfade) },

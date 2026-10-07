@@ -54,6 +54,11 @@ import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.settings.SpinSpeed
 import io.github.plvzfqrit.plvinyl.core.settings.SurfaceNoiseLevel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.toArgb
+import io.github.plvzfqrit.plvinyl.core.look.Paint
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
@@ -71,6 +76,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SettingsSheet(
     deck: DeckColors,
+    /** The deck paint (saved, or where painting would start). */
+    deckPaint: Color,
     finish: VinylFinish,
     art: Bitmap?,
     seedKey: String?,
@@ -117,6 +124,7 @@ fun SettingsSheet(
                         BackdropSwatch(
                             style = style,
                             art = art,
+                            paint = deckPaint,
                             selected = style == current,
                             ringColor = fg,
                             onClick = { tick(); onSelect(style) },
@@ -392,6 +400,7 @@ private fun ToggleRow(
 private fun BackdropSwatch(
     style: BackdropStyle,
     art: Bitmap?,
+    paint: Color,
     selected: Boolean,
     ringColor: Color,
     onClick: () -> Unit,
@@ -401,6 +410,7 @@ private fun BackdropSwatch(
         BackdropStyle.Charcoal -> "Charcoal"
         BackdropStyle.Amber -> "Amber"
         BackdropStyle.AlbumBlur -> "Album blur"
+        BackdropStyle.Custom -> "Custom"
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -447,6 +457,17 @@ private fun BackdropSwatch(
                             )
                         )
                     }
+                }
+                // Your paint, with a palette printed on it.
+                BackdropStyle.Custom -> Box(
+                    Modifier.size(50.dp).background(paint),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Palette, contentDescription = null,
+                        tint = Color(Paint.textOn(paint.toArgb())).copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
         }

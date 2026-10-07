@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalDensity
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import io.github.plvzfqrit.plvinyl.core.look.Paint
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -40,10 +42,26 @@ import kotlin.random.Random
  *  - Charcoal:  flat dark gray, a touch darker toward the bottom
  *  - Amber:     saturated orange that deepens toward the bottom
  *  - AlbumBlur: the current album art, heavily blurred and dimmed
+ *  - Custom:    your own paint (drawn live, so painting recolors it instantly)
  *
  * Colors are sampled from the reference screenshots.
  */
-enum class BackdropStyle { Paper, Charcoal, Amber, AlbumBlur }
+enum class BackdropStyle(
+    /** The background's main color (ARGB): where painting starts from. */
+    val baseColor: Int,
+) {
+    Paper(0xFFF0EDE8.toInt()),
+    Charcoal(0xFF383838.toInt()),
+    Amber(0xFFEE991A.toInt()),
+    AlbumBlur(0xFF383838.toInt()),
+    Custom(0xFF383838.toInt()),
+}
+
+/** What's on screen: a baked background, or the painted deck drawn live. */
+private sealed interface Layer {
+    data class Baked(val image: ImageBitmap) : Layer
+    data object Painted : Layer
+}
 
 @Composable
 fun TurntableBackdrop(
@@ -52,6 +70,8 @@ fun TurntableBackdrop(
     /** Identifies the record the art belongs to (e.g. "title|artist"). */
     artKey: String?,
     modifier: Modifier = Modifier,
+    /** The paint, for the Custom background. */
+    deckPaint: Color? = null,
 ) {
     val density = LocalDensity.current
 
@@ -73,27 +93,75 @@ fun TurntableBackdrop(
         // The new background fades in ON TOP of the old one, which stays fully opaque
         // underneath. (A regular crossfade makes both half-transparent at the midpoint,
         // so whatever is behind shows through: that was the flash.)
-        var shown by remember { mutableStateOf<ImageBitmap?>(null) }
-        var previous by remember { mutableStateOf<ImageBitmap?>(null) }
+        var shown by remember { mutableStateOf<Layer?>(null) }
+        var previous by remember { mutableStateOf<Layer?>(null) }
         val fade = remember { Animatable(1f) }
+        // The painted deck's grain doesn't depend on the color: baked once per size.
+        var grain by remember { mutableStateOf<Grain?>(null) }
         LaunchedEffect(style, washImage, w, h) {
             // Baked off the main thread; shown the moment it's ready.
-            val baked = withContext(Dispatchers.Default) {
-                bakeBackdrop(style, washImage, w, h, density)
+            val next = if (style == BackdropStyle.Custom) {
+                if (grain?.matches(w, h) != true) grain = withContext(Dispatchers.Default) { bakeGrain(w, h, density) }
+                Layer.Painted
+            } else {
+                Layer.Baked(withContext(Dispatchers.Default) { bakeBackdrop(style, washImage, w, h, density) })
             }
-            // If a fade was still running, keep whichever image is mostly visible below.
+            // If a fade was still running, keep whichever layer is mostly visible below.
             if (shown != null && (previous == null || fade.value >= 0.5f)) previous = shown
-            shown = baked
+            shown = next
             fade.snapTo(0f)
             fade.animateTo(1f, tween(500))
             previous = null
         }
 
         Canvas(Modifier.fillMaxSize()) {
-            previous?.let { drawImage(it) }
-            shown?.let { drawImage(it, alpha = if (previous != null) fade.value else 1f) }
+            fun draw(layer: Layer, alpha: Float) = when (layer) {
+                is Layer.Baked -> drawImage(layer.image, alpha = alpha)
+                Layer.Painted -> drawPaintedDeck(deckPaint ?: Color(BackdropStyle.Custom.baseColor), grain, alpha)
+            }
+            previous?.let { draw(it, 1f) }
+            shown?.let { draw(it, if (previous != null) fade.value else 1f) }
         }
     }
+}
+
+/** Light and dark specks for the painted deck, baked once per screen size (they don't depend on the color). */
+private class Grain(val light: ImageBitmap, val dark: ImageBitmap) {
+    fun matches(w: Int, h: Int) = light.width == w && light.height == h
+}
+
+private fun bakeGrain(w: Int, h: Int, density: Density): Grain {
+    fun bake(block: DrawScope.() -> Unit): ImageBitmap {
+        val bmp = ImageBitmap(w, h)
+        CanvasDrawScope().draw(density, LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(bmp), Size(w.toFloat(), h.toFloat()), block)
+        return bmp
+    }
+    return Grain(
+        light = bake { drawGrain(lightAlpha = 1f, darkAlpha = 0f) },
+        dark = bake { drawGrain(lightAlpha = 0f, darkAlpha = 1f) },
+    )
+}
+
+/**
+ * The painted deck: a gradient from the paint (a touch lighter at the top, deeper at the
+ * bottom, like the presets) and the grain, stronger on light paints (paper fibre) and
+ * fainter on dark ones. Drawn every frame it's needed, so a new paint shows at once.
+ */
+private fun DrawScope.drawPaintedDeck(paint: Color, grain: Grain?, alpha: Float) {
+    val argb = paint.toArgb()
+    val l = Paint.toHsl(argb).l
+    drawRect(
+        Brush.verticalGradient(
+            0f to Color(Paint.shade(argb, +0.02f)),
+            0.6f to paint,
+            1f to Color(Paint.shade(argb, -0.07f)),
+        ),
+        alpha = alpha,
+    )
+    if (grain == null) return
+    fun ramp(from: Float, to: Float) = ((l - from) / (to - from)).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
+    drawImage(grain.light, alpha = alpha * (0.03f + 0.32f * ramp(0.6f, 0.95f)))
+    drawImage(grain.dark, alpha = alpha * (0.06f - 0.025f * ramp(0.5f, 0.95f)))
 }
 
 /** Tonearm colors that belong with each background. */
@@ -137,8 +205,9 @@ internal fun BackdropStyle.tonearmColors(): TonearmColors = when (this) {
         restPost = Color(0xFF1A1A1A), restClip = Color(0x66FFE2B0), restClipOutline = Color(0xFF9C650C),
     )
 
-    // Dark deck: the photo's slate-gray arm on a dark plate.
-    BackdropStyle.Charcoal, BackdropStyle.AlbumBlur -> TonearmColors(
+    // Dark deck: the photo's slate-gray arm on a dark plate. (A painted deck starts from
+    // this or the Paper set and shades the plate from its paint: see DeckColors.)
+    BackdropStyle.Charcoal, BackdropStyle.AlbumBlur, BackdropStyle.Custom -> TonearmColors(
         plateLight = Color(0xFF3A3A3A), plateDark = Color(0xFF2C2C2C),
         plateOutline = Color(0xFF555555), innerRing = Color(0xFF444444),
         slotFill = Color(0xFF333333), slotOutline = Color(0xFF4A4A4A),
@@ -188,6 +257,9 @@ private fun bakeBackdrop(
                 )
                 drawGrain(lightAlpha = 0.04f, darkAlpha = 0.05f)
             }
+
+            // Drawn live instead (drawPaintedDeck); a plain fill if it's ever baked.
+            BackdropStyle.Custom -> drawRect(Color(BackdropStyle.Custom.baseColor))
 
             BackdropStyle.AlbumBlur -> {
                 if (wash == null) {

@@ -50,7 +50,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.toArgb
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
+import io.github.plvzfqrit.plvinyl.core.look.Paint
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylPalette
 import io.github.plvzfqrit.plvinyl.ui.lighting.drawLampLight
@@ -77,6 +79,8 @@ fun FrontPanel(
     style: BackdropStyle,
     /** Colors of the album on the platter (for the Album Blur front). */
     albumPalette: VinylPalette?,
+    /** The panel's paint, or null for the background's own material. */
+    paint: Color?,
     playing: Boolean,
     repeatOne: Boolean,
     /** The room's light. The face gets the same light as the deck around it; lit keys glow. */
@@ -107,7 +111,7 @@ fun FrontPanel(
                     .fillMaxWidth()
                     .height(12.dp)
                     .drawWithCache {
-                        val lip = lipBrush(style, album)
+                        val lip = paint?.let(::paintedLip) ?: lipBrush(style, album)
                         onDrawBehind {
                             drawRect(lip)
                             drawLine(Color.Black.copy(alpha = 0.25f), Offset(0f, size.height - 0.5f),
@@ -120,7 +124,7 @@ fun FrontPanel(
                 Modifier
                     .fillMaxWidth()
                     .drawWithCache {
-                        val texture = faceTexture(style, album, size, 4.dp.toPx())
+                        val texture = faceTexture(style, album, paint, size, 4.dp.toPx())
                         val faceLamp = lampCenter - Offset(0f, 12.dp.toPx())        // the face sits under the lip
                         onDrawBehind {
                             texture()
@@ -162,6 +166,14 @@ private fun lipBrush(style: BackdropStyle, album: Pair<Color, Color>): Brush = w
         val (a, b) = album
         Brush.horizontalGradient(listOf(lerp(a, Color.White, 0.12f), lerp(b, Color.White, 0.12f)))
     }
+    // A painted deck always comes with a panel paint; this is only a fallback.
+    BackdropStyle.Custom -> Brush.verticalGradient(listOf(Color(0xFF3A3A3A), Color(0xFF2C2C2C)))
+}
+
+/** The lip of a painted panel: the paint, catching a little light along its top. */
+private fun paintedLip(paint: Color): Brush {
+    val argb = paint.toArgb()
+    return Brush.verticalGradient(listOf(Color(Paint.shade(argb, +0.08f)), Color(Paint.shade(argb, -0.04f))))
 }
 
 private fun albumPair(p: VinylPalette?): Pair<Color, Color> =
@@ -179,12 +191,24 @@ private fun lerp(a: Color, b: Color, t: Float) = Color(
  * Each rib is [ribPx] tall (4 dp): a lit top edge, a rounded face, a dark groove
  * below. One repeating gradient draws them all, so it costs a single draw call.
  */
-private fun faceTexture(style: BackdropStyle, album: Pair<Color, Color>, size: Size, ribPx: Float): DrawScope.() -> Unit {
+private fun faceTexture(
+    style: BackdropStyle, album: Pair<Color, Color>, paint: Color?, size: Size, ribPx: Float,
+): DrawScope.() -> Unit {
     // (base, rib highlight strength, rib shadow strength)
     val base: Brush
     val hi: Float
     val sh: Float
-    when (style) {
+    if (paint != null) {
+        // Painted metal: light paints catch the light like aluminium, dark ones sink
+        // into their grooves like gunmetal.
+        val argb = paint.toArgb()
+        val l = Paint.toHsl(argb).l
+        base = Brush.verticalGradient(
+            0f to Color(Paint.shade(argb, +0.06f)), 0.55f to paint, 1f to Color(Paint.shade(argb, -0.18f)),
+        )
+        hi = 0.10f + 0.45f * l
+        sh = 0.55f - 0.33f * l
+    } else when (style) {
         BackdropStyle.Paper -> {            // ribbed aluminium
             base = Brush.verticalGradient(0f to Color(0xFFDCDEDF), 0.55f to Color(0xFFC3C6C8), 1f to Color(0xFFAEB1B3))
             hi = 0.55f; sh = 0.22f
@@ -202,6 +226,10 @@ private fun faceTexture(style: BackdropStyle, album: Pair<Color, Color>, size: S
             base = Brush.horizontalGradient(listOf(a, b, lerp(a, b, 0.5f)))
             hi = 0.12f; sh = 0.45f
         }
+        BackdropStyle.Custom -> {           // fallback: a painted deck always brings its panel paint
+            base = Brush.verticalGradient(0f to Color(0xFF34363A), 0.6f to Color(0xFF212225), 1f to Color(0xFF151618))
+            hi = 0.10f; sh = 0.55f
+        }
     }
     val ribs = Brush.verticalGradient(
         0.00f to Color.White.copy(alpha = hi),
@@ -213,7 +241,7 @@ private fun faceTexture(style: BackdropStyle, album: Pair<Color, Color>, size: S
         1.00f to Color.Black.copy(alpha = sh),
         startY = 0f, endY = ribPx, tileMode = TileMode.Repeated,
     )
-    val frost = style == BackdropStyle.AlbumBlur
+    val frost = paint == null && style == BackdropStyle.AlbumBlur
     return {
         drawRect(base)
         if (frost) drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f), Color.Black.copy(alpha = 0.50f))))

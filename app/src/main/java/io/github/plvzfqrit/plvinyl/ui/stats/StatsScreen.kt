@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.toArgb
+import io.github.plvzfqrit.plvinyl.core.look.Paint
 import io.github.plvzfqrit.plvinyl.core.model.SongKey
 import io.github.plvzfqrit.plvinyl.core.stats.StatsCalculator
 import io.github.plvzfqrit.plvinyl.core.stats.StatsPeriod
@@ -117,6 +119,25 @@ fun DeckColors.statsColors(): StatsColors {
             accent = Color.White, series1 = Color.White, series2 = Color(0xFF4A2300),
             other = Color.White.copy(alpha = 0.45f), chipOnText = Color(0xFFB86A0C),
         )
+        // A painted deck: the text color that reads on the paint, bars in that color too
+        // (any accent could clash with the paint), and the paint itself on the chips.
+        BackdropStyle.Custom -> {
+            val paint = deck ?: Color(0xFF383838)
+            val second = Color(Paint.shade(paint.toArgb(), if (isLight) -0.32f else +0.30f))
+            if (isLight) StatsColors(
+                textPrimary = fg, textSecondary = fg.copy(alpha = 0.72f), textMuted = fg.copy(alpha = 0.5f),
+                card = Color.Black.copy(alpha = 0.06f), line = Color.Black.copy(alpha = 0.12f),
+                track = Color.Black.copy(alpha = 0.08f),
+                accent = fg, series1 = fg, series2 = second,
+                other = fg.copy(alpha = 0.35f), chipOnText = paint,
+            ) else StatsColors(
+                textPrimary = Color(0xFFF3EFE7), textSecondary = Color(0xFFC3C2B7), textMuted = Color(0xFF9D9B92),
+                card = Color.Black.copy(alpha = 0.22f), line = Color.White.copy(alpha = 0.16f),
+                track = Color.White.copy(alpha = 0.1f),
+                accent = Color(0xFFF3EFE7), series1 = Color(0xFFF3EFE7), series2 = second,
+                other = Color.White.copy(alpha = 0.35f), chipOnText = paint,
+            )
+        }
         else -> darkStats(albumBlur = style == BackdropStyle.AlbumBlur)
     }
 }
