@@ -6,13 +6,12 @@ enum class Heat { Cool, Warm, Hot }
 /** What the phone is going through right now. */
 data class PhoneState(
     val heat: Heat = Heat.Cool,
-    val batterySaver: Boolean = false,
     /** The app has dimmed itself: nobody has touched it for a while. */
     val dimmed: Boolean = false,
 )
 
 /** Why the motion is lighter than chosen. */
-enum class SlowDown { Hot, Warm, BatterySaver, Dimmed }
+enum class SlowDown { Hot, Warm, Dimmed }
 
 /**
  * @param framesPerSecond for the moving parts, or [MotionPolicy.EVERY_FRAME]
@@ -24,8 +23,9 @@ data class Pace(val framesPerSecond: Int, val titlePasses: Int, val slowDown: Sl
 /**
  * How often the moving parts of the turntable (the record, a long title) are redrawn:
  * most of the app's battery use, and most of the phone's warmth. The record turns at
- * the screen's own rate (it looks steppy any slower); a warm phone, Battery Saver, or
- * a dimmed screen gets lighter motion, and a hot phone the lightest.
+ * the screen's own rate (it looks steppy any slower); a warm phone or a dimmed screen
+ * gets lighter motion, and a hot phone the lightest. (Not Battery Saver: the record
+ * would look janky all the time it's on.)
  */
 object MotionPolicy {
     /** Every frame the screen shows, at its own rate. */
@@ -45,7 +45,6 @@ object MotionPolicy {
         val (fps, why) = when {
             phone.heat == Heat.Hot -> HOT_FPS to SlowDown.Hot
             phone.heat == Heat.Warm -> atMost(chosen, LIGHT_FPS) to SlowDown.Warm
-            phone.batterySaver -> atMost(chosen, LIGHT_FPS) to SlowDown.BatterySaver
             phone.dimmed -> atMost(chosen, LIGHT_FPS) to SlowDown.Dimmed
             else -> chosen to null
         }

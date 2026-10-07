@@ -22,10 +22,9 @@ class MotionPolicyTest {
         assertEquals(3, pace(MotionQuality.Battery).titlePasses)
     }
 
-    @Test fun `a warm phone, Battery Saver or a dimmed screen get light motion, and say why`() {
+    @Test fun `a warm phone or a dimmed screen get light motion, and say why`() {
         val warm = pace(MotionQuality.Smooth, phone = PhoneState(heat = Heat.Warm))
         assertEquals(Pace(20, 3, SlowDown.Warm), warm)
-        assertEquals(SlowDown.BatterySaver, pace(MotionQuality.Balanced, phone = PhoneState(batterySaver = true)).slowDown)
         assertEquals(20, pace(MotionQuality.Balanced, phone = PhoneState(dimmed = true)).framesPerSecond)
     }
 

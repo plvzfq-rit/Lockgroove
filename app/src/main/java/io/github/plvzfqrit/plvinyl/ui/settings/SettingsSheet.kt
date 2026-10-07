@@ -334,7 +334,6 @@ fun SettingsSheet(
                 val why = when (slowDown) {
                     SlowDown.Hot -> "Your phone is hot: the record turns in slow steps until it cools down."
                     SlowDown.Warm -> "Your phone is warm: lighter motion until it cools down."
-                    SlowDown.BatterySaver -> "Battery Saver is on: lighter motion while it is."
                     SlowDown.Dimmed, null -> null
                 }
                 if (why != null) {

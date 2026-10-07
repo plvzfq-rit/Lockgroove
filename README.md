@@ -72,8 +72,8 @@ redraws what has visibly changed:
   the record, and in Battery mode both step evenly, 20 times a second.
 - The tonearm is redrawn only when it has moved a visible amount: while a song plays,
   the needle creeps well under a pixel a second.
-- When the phone says it's warm, or Battery Saver is on, motion gets lighter; when it's
-  hot, the record turns in slow steps until it cools down.
+- When the phone says it's warm, motion gets lighter; when it's hot, the record turns
+  in slow steps until it cools down.
 - The platter stops half a minute after the music does, and after 5 minutes without a
   touch the screen dims.
 
