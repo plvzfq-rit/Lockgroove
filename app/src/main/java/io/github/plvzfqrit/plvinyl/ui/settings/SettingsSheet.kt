@@ -212,6 +212,7 @@ fun SettingsSheet(
                 Text(
                     text = when (settings.lighting) {
                         LightingMode.Clock -> "Follows the sun where your phone's time zone says you are (no location used): a soft glow at sunrise, golden hour before sunset, a desk lamp after dark. Or hold it at any time of day below."
+                        LightingMode.Sunrise -> "Always sunrise: a soft, cool glow from the right, the sun just up."
                         LightingMode.Day -> "Always soft daylight."
                         LightingMode.Golden -> "Always golden hour: warm, low sun from the left."
                         LightingMode.Night -> "Always the desk lamp in a dark room."
@@ -415,8 +416,17 @@ private fun SectionTitle(text: String) {
 /** A row of pill-shaped options; exactly one is selected. */
 @Composable
 private fun ChoiceRow(options: List<String>, selected: Int, fg: Color, onPick: (Int) -> Unit) {
+    // Up to five fit on a row; more wrap into two even rows.
+    val perRow = if (options.size > 5) (options.size + 1) / 2 else options.size
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.withIndex().chunked(perRow).forEach { row -> ChoicePills(row, selected, fg, onPick) }
+    }
+}
+
+@Composable
+private fun ChoicePills(options: List<IndexedValue<String>>, selected: Int, fg: Color, onPick: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEachIndexed { i, label ->
+        options.forEach { (i, label) ->
             val isOn = i == selected
             Box(
                 contentAlignment = Alignment.Center,

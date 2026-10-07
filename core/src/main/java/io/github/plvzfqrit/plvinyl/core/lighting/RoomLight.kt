@@ -40,6 +40,7 @@ data class RoomLight(
 /** Follow the sun, or keep one time of day. Labels are short to fit one row. */
 enum class LightingMode(val label: String, val fixed: RoomLight?) {
     Clock("Sun", null),
+    Sunrise("Sunrise", RoomLight(dawn = 1f, sunFrom = 0f, sunHeight = 0.06f)),
     Day("Day", RoomLight()),
     Golden("Golden", RoomLight(golden = 1f, sunFrom = 180f, sunHeight = 0.08f)),
     Night("Night", RoomLight(night = 1f)),

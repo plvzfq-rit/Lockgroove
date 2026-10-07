@@ -77,6 +77,10 @@ class RoomLightTest {
         assertEquals(RoomLight(night = 1f), LightingMode.Night.lightAt(noon, 720f, place))
         assertEquals(RoomLight(), LightingMode.Day.lightAt(day + 23 * 3_600_000L, 1380f, place))
         assertEquals(180f, LightingMode.Golden.lightAt(noon, 720f, place).sunFrom)
+        val sunrise = LightingMode.Sunrise.lightAt(day + 22 * 3_600_000L, 1320f, place)
+        assertEquals(1f, sunrise.dawn)
+        assertEquals(0f, sunrise.sunFrom)                          // low sun from the right
+        assertEquals(0f, sunrise.night)
         assertEquals(sunLight(noon, 720f, place), LightingMode.Clock.lightAt(noon, 720f, place))
     }
 }
