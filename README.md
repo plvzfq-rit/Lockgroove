@@ -22,8 +22,10 @@ No ads, no account, no internet permission. Everything stays on your phone.
 - **Paint it.** Give the deck and the front panel your own colors: hand-picked hi-fi
   paints in one tap, or any color with hue / saturation / lightness sliders, previewed
   live on the turntable itself.
-- **Room lighting** that follows the clock: daylight, golden hour, and a desk lamp at
-  night.
+- **Light that follows the sun**, wherever your phone's time zone says you are (no
+  location used): a soft glow at sunrise, light swinging from right to left through the
+  day, golden hour as the sun sets, then a desk lamp. The record's shine and the shadows
+  move with it.
 - **Liner notes:** swipe left for your listening stats (most played, top artist, when
   you listen, streaks), counted on the phone only.
 - Optional **surface noise**, synthesized on the device.
