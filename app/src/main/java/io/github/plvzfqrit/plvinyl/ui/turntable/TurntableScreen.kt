@@ -553,13 +553,22 @@ fun TurntableScreen(
                     .padding(top = platterTop + platterSize + 16.dp, bottom = panelHeight)
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
-                // Title/artist fade to the new song. Long ones scroll (marquee).
+                // Title/artist fade to the new song. Long ones scroll (marquee) while the
+                // record plays (the screen is redrawing for the spin then anyway), and rest
+                // when it stops or the stats cover it. Battery: a few passes per song.
+                val passes = if (settings.motion == MotionQuality.Battery) 3 else Int.MAX_VALUE
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
                         val text = litTextColor(deck.contentColor, RoomLight(night = nightNow))
-                        MarqueeText(t, text, MaterialTheme.typography.headlineMedium)
+                        MarqueeText(
+                            t, text, MaterialTheme.typography.headlineMedium,
+                            scrolling = ui.playing, onScreen = animator.visible, passes = passes,
+                        )
                         if (a != null) {
-                            MarqueeText(a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
+                            MarqueeText(
+                                a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium,
+                                scrolling = ui.playing, onScreen = animator.visible, passes = passes,
+                            )
                         }
                     }
                 }
