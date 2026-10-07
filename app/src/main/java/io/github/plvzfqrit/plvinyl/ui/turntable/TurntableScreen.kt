@@ -599,11 +599,10 @@ fun TurntableScreen(
                     // Going Custom keeps the paint (or starts from the current background's color).
                     // A preset is the whole look: its own front panel comes back with it.
                     onSelect = { vm.setLook(look.copy(backdrop = it, panelPaint = null)) },
-                    onPaint = { customDeck ->
+                    onPaint = {
                         showSettings = false
                         // Going Custom starts from the paint so far (or the current background's color).
-                        draft = if (customDeck) saved.copy(backdrop = BackdropStyle.Custom, deckPaint = saved.deckPaintOrSeed)
-                        else saved
+                        draft = saved.copy(backdrop = BackdropStyle.Custom, deckPaint = saved.deckPaintOrSeed)
                         painting = PaintTarget.Deck
                     },
                     onSelectFinish = { vm.setLook(look.copy(finish = it)) },
