@@ -57,11 +57,11 @@ import androidx.compose.ui.unit.sp
 import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
 import io.github.plvzfqrit.plvinyl.core.look.Paint
 import io.github.plvzfqrit.plvinyl.core.model.RecordSizeChoice
-import io.github.plvzfqrit.plvinyl.core.settings.EndMargin
 import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
+import io.github.plvzfqrit.plvinyl.core.settings.Scale
+import io.github.plvzfqrit.plvinyl.core.settings.Scales
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
-import io.github.plvzfqrit.plvinyl.core.settings.SpinSpeed
-import io.github.plvzfqrit.plvinyl.core.settings.SurfaceNoiseLevel
+import io.github.plvzfqrit.plvinyl.ui.common.NotchedSlider
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
@@ -189,12 +189,53 @@ fun SettingsSheet(
             } }
             item { Column(Modifier.fillMaxWidth()) {
                 // ---------------- Turntable ----------------
-                SectionTitle("Spin speed")
-                ChoiceRow(
-                    options = SpinSpeed.entries.map { it.label },
-                    selected = settings.spin.ordinal,
-                    fg = fg,
-                ) { tick(); onSettings(settings.copy(spin = SpinSpeed.entries[it])) }
+                SectionTitle("Turntable")
+                SliderSetting("Spin speed", settings.spin, Scales.spin, fg, tick) {
+                    onSettings(settings.copy(spin = it))
+                }
+                Spacer(Modifier.height(14.dp))
+                SliderSetting("Lift the needle early", settings.endMarginMs.toFloat(), Scales.endMargin, fg, tick) {
+                    onSettings(settings.copy(endMarginMs = it.toLong()))
+                }
+                Text(
+                    text = "Gives up the last moment of each song so the next one never starts before the record is swapped.",
+                    fontSize = 12.sp,
+                    color = fg.copy(alpha = 0.6f),
+                )
+
+                // Crossfade: what the app has learned from your player, with a reset.
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Crossfade", fontSize = 15.sp)
+                        Text(
+                            text = if (learnedCrossfadeMs > 0L)
+                                "Learned ${"%.1f".format(learnedCrossfadeMs / 1000f)} s: the needle lifts that much early"
+                            else "None detected for this player",
+                            fontSize = 12.sp,
+                            color = fg.copy(alpha = 0.6f),
+                        )
+                    }
+                    if (learnedCrossfadeMs > 0L) {
+                        Text(
+                            text = "Reset",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable(role = Role.Button) { tick(); onResetCrossfade() }
+                                .border(1.dp, fg.copy(alpha = 0.3f), RoundedCornerShape(50))
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+
+                ToggleRow(
+                    title = "Dust cover",
+                    subtitle = "Closes over the deck after 2 minutes idle; tap to lift it",
+                    checked = settings.dustCover,
+                    fg = fg, bg = bg,
+                ) { tick(); onSettings(settings.copy(dustCover = it)) }
 
             } }
             item { Column(Modifier.fillMaxWidth()) {
@@ -233,57 +274,12 @@ fun SettingsSheet(
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
 
-                Spacer(Modifier.height(14.dp))
-                Text("Lift the needle early", fontSize = 15.sp)
-                Spacer(Modifier.height(8.dp))
-                ChoiceRow(
-                    options = EndMargin.entries.map { it.label },
-                    selected = settings.endMargin.ordinal,
-                    fg = fg,
-                ) { tick(); onSettings(settings.copy(endMargin = EndMargin.entries[it])) }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Gives up the last moment of each song so the next one never starts before the record is swapped.",
-                    fontSize = 12.sp,
-                    color = fg.copy(alpha = 0.6f),
-                )
-
-                // Crossfade: what the app has learned from your player, with a reset.
-                Spacer(Modifier.height(14.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Crossfade", fontSize = 15.sp)
-                        Text(
-                            text = if (learnedCrossfadeMs > 0L)
-                                "Learned ${"%.1f".format(learnedCrossfadeMs / 1000f)} s: the needle lifts that much early"
-                            else "None detected for this player",
-                            fontSize = 12.sp,
-                            color = fg.copy(alpha = 0.6f),
-                        )
-                    }
-                    if (learnedCrossfadeMs > 0L) {
-                        Text(
-                            text = "Reset",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .clickable(role = Role.Button) { tick(); onResetCrossfade() }
-                                .border(1.dp, fg.copy(alpha = 0.3f), RoundedCornerShape(50))
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                        )
-                    }
-                }
-
             } }
             item { Column(Modifier.fillMaxWidth()) {
-                SectionTitle("Surface noise")
-                ChoiceRow(
-                    options = SurfaceNoiseLevel.entries.map { it.label },
-                    selected = settings.surfaceNoise.ordinal,
-                    fg = fg,
-                ) { tick(); onSettings(settings.copy(surfaceNoise = SurfaceNoiseLevel.entries[it])) }
-                Spacer(Modifier.height(6.dp))
+                SectionTitle("Records")
+                SliderSetting("Surface noise", settings.surfaceNoise, Scales.surfaceNoise, fg, tick) {
+                    onSettings(settings.copy(surfaceNoise = it))
+                }
                 Text(
                     text = "Soft crackle while the needle is down, made on your phone. Plays alongside your music; turn it off any time.",
                     fontSize = 12.sp,
@@ -303,13 +299,6 @@ fun SettingsSheet(
                     checked = settings.countInBackground,
                     fg = fg, bg = bg,
                 ) { tick(); onSettings(settings.copy(countInBackground = it)) }
-
-                ToggleRow(
-                    title = "Dust cover",
-                    subtitle = "Closes over the deck after 2 minutes idle; tap to lift it",
-                    checked = settings.dustCover,
-                    fg = fg, bg = bg,
-                ) { tick(); onSettings(settings.copy(dustCover = it)) }
 
             } }
             item { Column(Modifier.fillMaxWidth()) {
@@ -388,6 +377,36 @@ private fun SectionTitle(text: String) {
     Spacer(Modifier.height(24.dp))
     Text(text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(14.dp))
+}
+
+/**
+ * A setting on a slider, with what it's set to on the right. The thumb clicks into the
+ * named stops (the old fixed choices), with a tick.
+ */
+@Composable
+private fun SliderSetting(title: String, value: Float, scale: Scale, fg: Color, tick: () -> Unit, onValue: (Float) -> Unit) {
+    val label = scale.label(value)
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, fontSize = 15.sp, modifier = Modifier.weight(1f))
+            Text(label, fontSize = 13.sp, color = fg.copy(alpha = 0.7f))
+        }
+        NotchedSlider(
+            value = scale.fraction(value),
+            onValueChange = { f ->
+                val v = scale.valueAt(f)
+                if (v != value) {
+                    if (scale.stopAt(v) != null) tick()
+                    onValue(v)
+                }
+            },
+            notches = scale.stops.map { scale.fraction(it.value) },
+            color = fg,
+            label = title,
+            valueText = label,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /** A row of pill-shaped options; exactly one is selected. */

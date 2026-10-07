@@ -2,26 +2,33 @@ package io.github.plvzfqrit.plvinyl.core.settings
 
 import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
 import io.github.plvzfqrit.plvinyl.core.model.RecordSizeChoice
+import kotlin.math.roundToInt
 
-/** How fast the platter turns. */
-enum class SpinSpeed(val label: String, val degPerSec: Float) {
-    Slow("Slow", 30f),              // 12 s per turn (the original look)
-    Medium("Medium", 60f),          // 6 s per turn
-    Real("33⅓ RPM", 200f),          // a real record player
-}
+/** The settings you slide. Their stops are the fixed choices they used to have. */
+object Scales {
+    /** How fast the platter turns, degrees a second: from lazy to a real 33⅓ RPM. */
+    val spin = Scale(
+        min = 15f, max = 200f, step = 1f, logarithmic = true,
+        stops = listOf(Stop("Slow", 30f), Stop("Medium", 60f), Stop("33⅓ RPM", 200f)),
+        describe = { degPerSec ->
+            val rpm = degPerSec / 6f
+            if (rpm < 10f) "%.1f RPM".format(rpm) else "${rpm.roundToInt()} RPM"
+        },
+    )
 
-/** How long before the end of a song the needle lifts (margin against auto-advance). */
-enum class EndMargin(val label: String, val ms: Long) {
-    Short("0.5 s", 500L),
-    Normal("1 s", 1000L),
-    Long("2 s", 2000L),
-}
+    /** How long before the end of a song the needle lifts, ms. */
+    val endMargin = Scale(
+        min = 300f, max = 3000f, step = 100f,
+        stops = listOf(Stop("0.5 s", 500f), Stop("1 s", 1000f), Stop("2 s", 2000f)),
+        describe = { ms -> "%.1f s".format(ms / 1000f) },
+    )
 
-/** Crackle and hiss while the needle is on the record (made on the phone, no audio files). */
-enum class SurfaceNoiseLevel(val label: String, val gain: Float) {
-    Off("Off", 0f),
-    Light("Light", 0.55f),
-    Heavy("Well-loved", 1f),
+    /** Surface noise, from none to a well-loved record. */
+    val surfaceNoise = Scale(
+        min = 0f, max = 1f, step = 0.05f,
+        stops = listOf(Stop("Off", 0f), Stop("Light", 0.55f), Stop("Well-loved", 1f)),
+        describe = { level -> "${(level * 100).roundToInt()}%" },
+    )
 }
 
 /**
@@ -36,7 +43,8 @@ enum class MotionQuality(val label: String, val fps: Int) {
 
 /** Everything adjustable, plus what the app has learned. Plain data: saved by the app. */
 data class Settings(
-    val spin: SpinSpeed = SpinSpeed.Slow,
+    /** How fast the platter turns, degrees a second ([Scales.spin]; 30 = a turn every 12 s). */
+    val spin: Float = 30f,
     val grooveGlints: Boolean = true,
     /** How smoothly (and how often) the record is redrawn. */
     val motion: MotionQuality = MotionQuality.Balanced,
@@ -51,13 +59,14 @@ data class Settings(
      * today's sun where you are. Null = follow the clock.
      */
     val sunTime: Int? = null,
-    val endMargin: EndMargin = EndMargin.Normal,
+    /** How long before the end of a song the needle lifts, ms: a margin against the player moving on by itself. */
+    val endMarginMs: Long = 1000L,
     /** 7" singles for short songs, 12" LPs for long ones (or always one size). */
     val recordSize: RecordSizeChoice = RecordSizeChoice.Auto,
     /** Close the dust cover after a while idle. */
     val dustCover: Boolean = true,
-    /** Surface noise while the needle is down. */
-    val surfaceNoise: SurfaceNoiseLevel = SurfaceNoiseLevel.Off,
+    /** Surface noise while the needle is down: 0 = none, 1 = a well-loved record (made on the phone). */
+    val surfaceNoise: Float = 0f,
     /** Records you play a lot show it (scuffs, spindle marks, a duller shine). */
     val recordWear: Boolean = true,
     /** Also count plays (for stats) while the app is closed. */

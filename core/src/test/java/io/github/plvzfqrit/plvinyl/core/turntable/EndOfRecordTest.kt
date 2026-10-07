@@ -36,6 +36,15 @@ class EndOfRecordTest {
         assertTrue(h.deck.needleOn != null, "the needle stays down in the lead-out")
     }
 
+    @Test fun `a longer margin on the slider sends the needle into the lead-out earlier`() {
+        c.updateSettings { it.copy(endMarginMs = 2_500L) }
+        nearTheEnd()
+        h.run(7_000)                                                 // 2.7 s left: not yet
+        assertFalse(c.ui.value.inLeadOut)
+        h.run(400)                                                   // 2.3 s left
+        assertTrue(c.ui.value.inLeadOut)
+    }
+
     @Test fun `after the lead-out the next record comes`() {
         nearTheEnd()
         h.run(9_300)

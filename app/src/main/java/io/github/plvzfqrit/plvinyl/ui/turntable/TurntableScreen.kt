@@ -217,7 +217,7 @@ fun TurntableScreen(
     PhoneSettingsEffects(settings, lightRoom = deck.isLight && nightNow < 0.5f, audible = ui.audible)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
-        animator.spinDegPerSec = settings.spin.degPerSec * (disc?.size?.spinFactor ?: 1f)
+        animator.spinDegPerSec = settings.spin * (disc?.size?.spinFactor ?: 1f)
         // How often the record is redrawn (the biggest battery cost).
         animator.frameIntervalMs = settings.motion.fps.let { if (it == 0) 0L else 1000L / it }
     }
@@ -238,7 +238,7 @@ fun TurntableScreen(
     LaunchedEffect(settings.surfaceNoise, inForeground, ui.needleDown, ui.sounding, ui.inLeadOut, noiseSize) {
         val on = inForeground && ui.needleDown && (ui.sounding || ui.inLeadOut)
         noise.set(
-            level = if (on) settings.surfaceNoise.gain else 0f,
+            level = if (on) settings.surfaceNoise else 0f,
             lockedGrooveMs = if (ui.inLeadOut) noiseSize.revolutionMs else 0L,
         )
     }

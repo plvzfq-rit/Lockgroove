@@ -284,7 +284,7 @@ class TurntableController(
             val ending = end.tick(
                 now, s, needleOn, audible(), browsing = skips.browsing, wantPlaying = arbiter.wantPlaying,
                 grabbing = grabAngle != null,
-                leadMs = _settings.value.endMargin.ms + (s?.let { crossfade.leadFor(it.player) } ?: 0L),
+                leadMs = _settings.value.endMarginMs + (s?.let { crossfade.leadFor(it.player) } ?: 0L),
                 repeatOne = _settings.value.repeatOne,
             )
             when (ending) {
