@@ -255,6 +255,8 @@ enum class KeyIcon { Previous, Next, StartStop, Cue, RepeatOne }
 
 private val Ink = Color(0xFFE9E3D8)
 private val Glow = Color(0xFFFFB54A)
+/** The warm white of a backlit symbol at night. */
+private val Backlight = Color(0xFFFFF0D8)
 
 /** A black key on the front face: sinks in when pressed; its symbol glows when on. */
 @Composable
@@ -316,6 +318,22 @@ private fun Key(
             val travel = 3.dp.toPx() * press
             val h = size.height - 3.dp.toPx()
             val corner = CornerRadius(6.dp.toPx())
+            // On: a ring of amber light around the key, faint by day, glowing at night.
+            // (Drawn first: the cap covers its inner half, so it reads as light around the edge.)
+            if (glow > 0f) {
+                val ring = glow * (0.35f + 0.65f * n)
+                val grow = 2.dp.toPx()
+                drawRoundRect(
+                    Glow.copy(alpha = 0.22f * ring),
+                    Offset(-grow, travel - grow), Size(size.width + 2 * grow, h + 2 * grow),
+                    CornerRadius(corner.x + grow), style = Stroke(5.dp.toPx()),
+                )
+                drawRoundRect(
+                    Glow.copy(alpha = 0.75f * ring),
+                    Offset(-grow / 2, travel - grow / 2), Size(size.width + grow, h + grow),
+                    CornerRadius(corner.x + grow / 2), style = Stroke(1.5.dp.toPx()),
+                )
+            }
             // Depth under the key (shrinks as it's pushed in)
             drawRoundRect(Color.Black, Offset(0f, travel + 3.dp.toPx() * (1f - press)), Size(size.width, h), corner)
             drawRoundRect(
@@ -331,6 +349,16 @@ private fun Key(
                 strokeWidth = 1.dp.toPx(),
             )
             val c = Offset(size.width / 2f, travel + h / 2f)
+            // Backlight: at night every symbol glows a soft warm white, and a press makes
+            // it flare for a moment.
+            val backlit = (0.14f * n + 0.18f * press) * (1f - glow)
+            if (backlit > 0f) {
+                val r = 12.dp.toPx()
+                drawCircle(
+                    Brush.radialGradient(listOf(Backlight.copy(alpha = backlit), Color.Transparent), center = c, radius = r),
+                    r, c,
+                )
+            }
             // Glow: a soft amber halo behind a lit symbol (stronger in the dark).
             if (glow > 0f) {
                 val r = 13.dp.toPx()
@@ -342,14 +370,10 @@ private fun Key(
                     r, c,
                 )
             }
-            val unlit = Ink.copy(alpha = 1f - 0.45f * n)
-            val color = Color(
-                unlit.red + (Glow.red - unlit.red) * glow,
-                unlit.green + (Glow.green - unlit.green) * glow,
-                unlit.blue + (Glow.blue - unlit.blue) * glow,
-                unlit.alpha + (1f - unlit.alpha) * glow,
-            )
-            drawKeyIcon(icon, color, c, 21.dp.toPx())
+            // The symbol: printed cream by day, backlit warm white at night, amber when on;
+            // a press flares it toward white.
+            val symbol = lerp(lerp(lerp(Ink, Backlight, n), Glow, glow), Color.White, 0.45f * press)
+            drawKeyIcon(icon, symbol, c, 21.dp.toPx())
         }
     }
 }
