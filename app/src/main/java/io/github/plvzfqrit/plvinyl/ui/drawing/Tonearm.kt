@@ -235,6 +235,69 @@ fun DrawScope.drawTonearmArm(
     }
 }
 
+/** The desk lamp's warm light, as the arm's metal gives it back. */
+private val LampShine = Color(0xFFFFE4BC)
+
+/**
+ * The desk lamp caught in the arm's metal at night: a thin line of light along the chrome
+ * tube (brightest toward the headshell, nearer the lamp), and glints on the counterweight,
+ * the bearing cap and the finger lift. Draw it ABOVE the room's darkness: in a dim room,
+ * reflections are what you still see. Same placement and lift as [drawTonearmArmForPlatter].
+ *
+ * @param strength 0 = nothing (by day), 1 = full lamplight
+ * @param lampFrom where the light comes from (degrees, screen: 0 = right, -90 = top)
+ */
+fun DrawScope.drawTonearmGlints(
+    spindle: Offset,
+    platterRadiusPx: Float,
+    armAngleDeg: Float,
+    lift: Float,
+    strength: Float,
+    lampFrom: Float,
+) {
+    if (strength <= 0f) return
+    val (pivot, pxPerUnit) = tonearmPlacementFor(spindle, platterRadiusPx)
+    val grow = 1f + LIFT_SCALE * lift.coerceIn(0f, 1f)
+    // The lamp's side in the arm's own frame: a cylinder shows the light as a line along
+    // the side that faces it.
+    val side = cos(Math.toRadians((lampFrom - armAngleDeg).toDouble())).toFloat()
+    fun shine(alpha: Float) = LampShine.copy(alpha = (alpha * strength).coerceIn(0f, 1f))
+    withTransform({
+        translate(pivot.x, pivot.y)
+        scale(pxPerUnit, pxPerUnit, pivot = Offset.Zero)
+        rotate(armAngleDeg, pivot = Offset.Zero)
+        scale(grow, grow, pivot = Offset.Zero)
+    }) {
+        with(TonearmGeometry) {
+            // Tube: a soft bloom, and the bright line in it.
+            val x = tube.center.x + side * tube.width * 0.2f
+            val from = Offset(x, tube.top + 2f)
+            val to = Offset(x, tube.bottom - 2f)
+            drawLine(
+                Brush.verticalGradient(listOf(shine(0.04f), shine(0.16f)), startY = from.y, endY = to.y),
+                from, to, strokeWidth = 4.5f, cap = StrokeCap.Round,
+            )
+            drawLine(
+                Brush.verticalGradient(listOf(shine(0.30f), shine(0.90f)), startY = from.y, endY = to.y),
+                from, to, strokeWidth = 1.3f, cap = StrokeCap.Round,
+            )
+            // Counterweight: the same along its drum, fainter (further from the lamp).
+            val cx = counterweight.center.x + side * counterweight.width * 0.18f
+            drawLine(
+                shine(0.45f), Offset(cx, counterweight.top + 3f), Offset(cx, counterweight.bottom - 3f),
+                strokeWidth = 1.4f, cap = StrokeCap.Round,
+            )
+            // The bearing cap, and the finger lift at the headshell.
+            glint(Offset(cap.center.x + side * 4f, cap.top + 7f), 4f, shine(0.55f))
+            drawLine(shine(0.85f), fingerLiftStart, fingerLiftEnd, strokeWidth = 1.1f, cap = StrokeCap.Round)
+            glint(fingerLiftEnd, 5f, shine(0.45f))
+        }
+    }
+}
+
+private fun DrawScope.glint(at: Offset, radius: Float, color: Color) =
+    drawCircle(Brush.radialGradient(listOf(color, Color.Transparent), center = at, radius = radius), radius, at)
+
 /** Both layers at once (only for standalone use, with no platter involved). */
 fun DrawScope.drawTonearm(
     pivot: Offset, pxPerUnit: Float, armAngleDeg: Float, colors: TonearmColors = TonearmColors(),

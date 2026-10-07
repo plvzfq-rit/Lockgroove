@@ -263,8 +263,8 @@ enum class KeyIcon { Previous, Next, StartStop, Cue, RepeatOne }
 
 private val Ink = Color(0xFFE9E3D8)
 private val Glow = Color(0xFFFFB54A)
-/** The warm white of a backlit symbol at night. */
-private val Backlight = Color(0xFFFFF0D8)
+/** The warm white of a backlit symbol at night (the keys, the settings knob). */
+internal val Backlight = Color(0xFFFFF0D8)
 
 /** A black key on the front face: sinks in when pressed; its symbol glows when on. */
 @Composable

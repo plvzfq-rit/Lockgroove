@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -123,6 +124,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
 import io.github.plvzfqrit.plvinyl.ui.drawing.deckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
+import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmGlints
 import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
@@ -362,6 +364,27 @@ fun TurntableScreen(
         val panelTop = with(screenDensity) { (screenHeight - panelHeight).toPx() }
         val armColors = deck.tonearm
 
+        // While a song plays, the needle creeps along the groove at well under a pixel a
+        // second. Drawn at the nearest quarter pixel (at the needle), the arm repaints a few
+        // times a second instead of every frame. Swings and drags still move it every frame.
+        // (Touches use the exact angle.) Its night glints use the same angle.
+        val armStepDeg = with(screenDensity) {
+            val stylusPx = TonearmGeometry.stylusTip.getDistance() * platterRadius.toPx() / TurntableGeometry.PLATTER_RADIUS
+            Math.toDegrees(0.25 / stylusPx).toFloat()
+        }
+        val drawnArmDeg by remember(armStepDeg) {
+            derivedStateOf { (animator.armAngle.value / armStepDeg).roundToInt() * armStepDeg }
+        }
+
+        // The settings knob sits under the tonearm, on the platter's baseline: a 54 dp square
+        // (42 dp knob + 6 dp margin) whose bottom is on the baseline. Its backlight goes in
+        // the upper layer, at the same place, flaring with its presses.
+        val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
+        val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
+        val settingsCenterX = minOf(pivotX + unit * 40f, screenWidth - 12.dp - 27.dp)
+        val knobAt = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp)
+        val knobPress = remember { MutableInteractionSource() }
+
         // The lamp hangs over the record's resting place.
         val lampCenter = with(screenDensity) { Offset(spindleX.toPx(), spindleY.toPx()) }
         val lampRadius = with(screenDensity) { platterRadius.toPx() } * (disc?.size?.radiusOfPlatter ?: RECORD_TO_PLATTER)
@@ -456,17 +479,6 @@ fun TurntableScreen(
             // plays from. Let go off the record and it goes back to rest.
             // Swipe the record itself to change songs: ← next, → previous.
             val latestUi by rememberUpdatedState(ui)
-            // While a song plays, the needle creeps along the groove at well under a pixel a
-            // second. Drawn at the nearest quarter pixel (at the needle), the arm repaints a
-            // few times a second instead of every frame. Swings and drags still move it every
-            // frame. (Touches use the exact angle.)
-            val armStepDeg = with(screenDensity) {
-                val stylusPx = TonearmGeometry.stylusTip.getDistance() * platterRadius.toPx() / TurntableGeometry.PLATTER_RADIUS
-                Math.toDegrees(0.25 / stylusPx).toFloat()
-            }
-            val drawnArmDeg by remember(armStepDeg) {
-                derivedStateOf { (animator.armAngle.value / armStepDeg).roundToInt() * armStepDeg }
-            }
             Canvas(
                 Modifier
                     .fillMaxSize()
@@ -553,14 +565,11 @@ fun TurntableScreen(
             }
 
             // Settings: a knob under the tonearm, on the platter's baseline.
-            val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
-            val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
-            val settingsCenterX = minOf(pivotX + unit * 40f, screenWidth - 12.dp - 27.dp)
             SettingsKnob(
                 onClick = { showSettings = true },
                 shadow = { roomLight().shadow() },
-                // 54 dp square (42 dp knob + 6 dp margin): its bottom sits on the platter's baseline.
-                modifier = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp),
+                interaction = knobPress,
+                modifier = knobAt,
             )
         }
 
@@ -570,6 +579,23 @@ fun TurntableScreen(
 
         // ---- The deck, upper layer: what stays readable at any hour.
         Box(Modifier.fillMaxSize().deckSlide(deckOut)) {
+            // At night the desk lamp catches the arm's metal: thin warm lines and glints, above
+            // the room's darkness (a little softer when the lamp is turned down late).
+            Canvas(Modifier.fillMaxSize()) {
+                val l = roomLight()
+                if (l.night <= 0f) return@Canvas
+                drawTonearmGlints(
+                    spindle = Offset(spindleX.toPx(), spindleY.toPx()),
+                    platterRadiusPx = platterRadius.toPx(),
+                    armAngleDeg = drawnArmDeg,
+                    lift = animator.armLift.value,
+                    strength = l.night * (1f - 0.3f * l.late),
+                    lampFrom = l.lightFrom(),
+                )
+            }
+            // The settings knob's backlight, like the keys'.
+            SettingsKnobLight(knobPress, night = { roomLight().night }, modifier = knobAt)
+
             // While you hold the arm: where in the song the needle would land.
             HeldLabel(
                 held = vm.held,
