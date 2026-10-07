@@ -63,6 +63,23 @@ Two Gradle modules:
   into snapshots; `TurntableAnimator` animates each planned move; the drawing code
   bakes static layers into bitmaps so a spinning record costs one GPU rotation per frame.
 
+## Easy on the battery
+
+Redrawing the screen is what uses the battery (and warms the phone), so the app only
+redraws what has visibly changed:
+
+- Everything that moves keeps one beat: the record redraws 30 times a second at slow
+  speeds (60 at 33⅓), and a scrolling title moves on the same frames.
+- The tonearm is redrawn only when it has moved a visible amount: while a song plays,
+  the needle creeps well under a pixel a second.
+- When the phone says it's warm, or Battery Saver is on, motion gets lighter; when it's
+  hot, the record turns in slow steps until it cools down.
+- The platter stops half a minute after the music does, and after 5 minutes without a
+  touch the screen dims.
+
+`tools/battery_check.sh` measures frames per second, the app's CPU use and the phone's
+temperatures over a minute, to compare before and after a change.
+
 ## Tests
 
 ```
