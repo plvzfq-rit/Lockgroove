@@ -114,6 +114,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.Look
 import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.common.rememberBeat
+import io.github.plvzfqrit.plvinyl.ui.common.rememberPhoneState
 import io.github.plvzfqrit.plvinyl.ui.drawing.TonearmGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
@@ -219,9 +220,11 @@ fun TurntableScreen(
     val nightNow by remember { derivedStateOf { (roomLight().night * 20f).roundToInt() / 20f } }
     PhoneSettingsEffects(settings, lightRoom = deck.isLight && nightNow < 0.5f, audible = ui.audible)
     // How often what moves is redrawn (the record, a long title): the biggest battery
-    // cost. Everything moving keeps the same beat, so it all repaints together.
-    val framesPerSecond = MotionPolicy.framesPerSecond(settings.motion, settings.spin)
-    val beat = rememberBeat(framesPerSecond)
+    // cost. Lighter when the phone is warm or saving battery. Everything moving keeps the
+    // same beat, so it all repaints together.
+    val phone = rememberPhoneState(dimmed = false)
+    val pace = MotionPolicy.pace(settings.motion, settings.spin, phone)
+    val beat = rememberBeat(pace.framesPerSecond)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
         animator.spinDegPerSec = settings.spin * (disc?.size?.spinFactor ?: 1f)
@@ -573,7 +576,7 @@ fun TurntableScreen(
                 // Title/artist fade to the new song. Long ones scroll (marquee) while the
                 // record plays (the screen is redrawing for the spin then anyway), and rest
                 // when it stops or the stats cover it. Light motion: a few passes per song.
-                val passes = MotionPolicy.titlePasses(framesPerSecond)
+                val passes = pace.titlePasses
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
                         val text = litTextColor(deck.contentColor, RoomLight(night = nightNow))
@@ -649,6 +652,7 @@ fun TurntableScreen(
                         showSettings = false                                // so you can watch
                         vm.previewDay()
                     },
+                    slowDown = pace.slowDown,
                     onSetTime = {
                         showSettings = false                                // so you can see the room
                         vm.stopPreviewDay()

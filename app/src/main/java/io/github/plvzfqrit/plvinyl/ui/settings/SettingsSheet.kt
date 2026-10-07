@@ -65,6 +65,7 @@ import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
 import io.github.plvzfqrit.plvinyl.core.settings.Scale
 import io.github.plvzfqrit.plvinyl.core.settings.Scales
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
+import io.github.plvzfqrit.plvinyl.core.settings.SlowDown
 import io.github.plvzfqrit.plvinyl.ui.common.NotchedSlider
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
@@ -101,6 +102,8 @@ fun SettingsSheet(
     onPreviewDay: () -> Unit,
     /** Choose a time of day for the sun, on a card over the deck. */
     onSetTime: () -> Unit,
+    /** Why the motion is lighter than chosen right now, if it is. */
+    slowDown: SlowDown?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -328,6 +331,16 @@ fun SettingsSheet(
                     fontSize = 12.sp,
                     color = fg.copy(alpha = 0.6f),
                 )
+                val why = when (slowDown) {
+                    SlowDown.Hot -> "Your phone is hot: the record turns in slow steps until it cools down."
+                    SlowDown.Warm -> "Your phone is warm: lighter motion until it cools down."
+                    SlowDown.BatterySaver -> "Battery Saver is on: lighter motion while it is."
+                    SlowDown.Dimmed, null -> null
+                }
+                if (why != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(why, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = fg.copy(alpha = 0.85f))
+                }
                 Spacer(Modifier.height(8.dp))
                 ToggleRow(
                     title = "Keep screen on while playing",

@@ -1,10 +1,32 @@
 package io.github.plvzfqrit.plvinyl.core.settings
 
+/** How warm the phone says it is (Android's thermal status, simplified). */
+enum class Heat { Cool, Warm, Hot }
+
+/** What the phone is going through right now. */
+data class PhoneState(
+    val heat: Heat = Heat.Cool,
+    val batterySaver: Boolean = false,
+    /** The app has dimmed itself: nobody has touched it for a while. */
+    val dimmed: Boolean = false,
+)
+
+/** Why the motion is lighter than chosen. */
+enum class SlowDown { Hot, Warm, BatterySaver, Dimmed }
+
+/**
+ * @param framesPerSecond for the moving parts, or [MotionPolicy.EVERY_FRAME]
+ * @param titlePasses how many times a long title goes round per song
+ * @param slowDown why it's lighter than the chosen motion right now (null = it isn't)
+ */
+data class Pace(val framesPerSecond: Int, val titlePasses: Int, val slowDown: SlowDown? = null)
+
 /**
  * How often the moving parts of the turntable (the record, a long title) are redrawn:
  * most of the app's battery use, and most of the phone's warmth. A slowly turning
  * record looks the same at 30 frames a second as at 60, so it gets 30; a record at
- * 33⅓ RPM needs 60 to stay smooth.
+ * 33⅓ RPM needs 60 to stay smooth. A warm phone, Battery Saver, or a dimmed screen
+ * gets lighter motion; a hot phone, the lightest.
  */
 object MotionPolicy {
     /** Every frame the screen shows, at its own rate. */
@@ -13,17 +35,32 @@ object MotionPolicy {
     /** Spins up to this fast (degrees a second: Slow and Medium) look smooth at 30 fps. */
     const val SLOW_SPIN = 60f
 
-    /** Frames a second for the moving parts, or [EVERY_FRAME]. */
-    fun framesPerSecond(motion: MotionQuality, spinDegPerSec: Float): Int = when (motion) {
-        MotionQuality.Smooth -> EVERY_FRAME
-        MotionQuality.Balanced -> if (spinDegPerSec <= SLOW_SPIN) 30 else 60
-        MotionQuality.Battery -> 20
+    /** Light motion: at this rate or below, scrolling text steps visibly, so it only goes round a few times. */
+    private const val LIGHT_FPS = 20
+
+    /** A hot phone: the record turns in slow steps and the title rests. */
+    private const val HOT_FPS = 10
+
+    fun pace(motion: MotionQuality, spinDegPerSec: Float, phone: PhoneState = PhoneState()): Pace {
+        val chosen = when (motion) {
+            MotionQuality.Smooth -> EVERY_FRAME
+            MotionQuality.Balanced -> if (spinDegPerSec <= SLOW_SPIN) 30 else 60
+            MotionQuality.Battery -> LIGHT_FPS
+        }
+        val (fps, why) = when {
+            phone.heat == Heat.Hot -> HOT_FPS to SlowDown.Hot
+            phone.heat == Heat.Warm -> atMost(chosen, LIGHT_FPS) to SlowDown.Warm
+            phone.batterySaver -> atMost(chosen, LIGHT_FPS) to SlowDown.BatterySaver
+            phone.dimmed -> atMost(chosen, LIGHT_FPS) to SlowDown.Dimmed
+            else -> chosen to null
+        }
+        val passes = when {
+            phone.heat == Heat.Hot -> 0
+            fps in 1..LIGHT_FPS -> 3
+            else -> Int.MAX_VALUE
+        }
+        return Pace(fps, passes, why.takeIf { fps != chosen })
     }
 
-    /** How many times a long title goes round per song: for good, or a few times when motion is light. */
-    fun titlePasses(framesPerSecond: Int): Int =
-        if (framesPerSecond in 1..LIGHT_FPS) 3 else Int.MAX_VALUE
-
-    /** At this rate or below, scrolling text steps visibly: it only goes round a few times. */
-    private const val LIGHT_FPS = 20
+    private fun atMost(fps: Int, cap: Int) = if (fps == EVERY_FRAME || fps > cap) cap else fps
 }
