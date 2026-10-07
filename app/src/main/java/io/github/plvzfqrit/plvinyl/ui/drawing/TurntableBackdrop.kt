@@ -113,7 +113,9 @@ fun TurntableBackdrop(
         val fade = remember { Animatable(1f) }
         // The painted deck's grain doesn't depend on the color: baked once per size.
         var grain by remember { mutableStateOf<Grain?>(null) }
-        LaunchedEffect(style, washImage, w, h) {
+        // Only the album blur changes with the record; the others are baked once.
+        val albumWash = if (style == BackdropStyle.AlbumBlur) washImage else null
+        LaunchedEffect(style, albumWash, w, h) {
             // Baked off the main thread; shown the moment it's ready.
             val next = if (style == BackdropStyle.Custom) {
                 if (grain?.matches(w, h) != true) grain = withContext(Dispatchers.Default) { bakeGrain(w, h, density) }
@@ -121,7 +123,7 @@ fun TurntableBackdrop(
             } else {
                 Layer.Baked(withContext(Dispatchers.Default) {
                     val wood = style.wood?.let { decodeWood(resources, it) }
-                    bakeBackdrop(style, washImage, wood, w, h, density)
+                    bakeBackdrop(style, albumWash, wood, w, h, density)
                 })
             }
             // If a fade was still running, keep whichever layer is mostly visible below.
