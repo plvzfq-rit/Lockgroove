@@ -45,4 +45,33 @@ class RoomLightControllerTest {
         val afternoon = c.ui.value.roomLight.sunFrom
         assertTrue(morning > -90f && afternoon < -90f, "morning $morning, afternoon $afternoon")
     }
+
+    @Test fun `watching a day go by shows night and day in under a minute, then returns to now`() {
+        h.clock.zone = "Africa/Accra"
+        h.clock.wall = day + 12 * 3_600_000L                       // noon
+        h.clock.minute = 12 * 60f
+        c.onStart()
+        h.run(200)
+        val now = c.ui.value.roomLight
+        c.updateSettings { it.copy(lighting = LightingMode.Day) }  // whatever the setting, it plays the sun
+        h.run(200)
+        c.previewDay()
+        val nights = ArrayList<Float>()
+        repeat(48) { h.run(1_000); nights += c.ui.value.roomLight.night }
+        assertTrue(nights.max() > 0.99f && nights.min() < 0.01f, "nights: $nights")
+        h.run(1_000)
+        assertEquals(null, c.ui.value.previewMinute)
+        assertEquals(RoomLight(), c.ui.value.roomLight)            // back to the Day setting
+        assertTrue(now.night < 0.01f)
+    }
+
+    @Test fun `the preview shows its own clock while it plays`() {
+        h.clock.minute = 6 * 60f
+        c.onStart()
+        h.run(200)
+        c.previewDay()
+        h.run(12_000)                                              // a quarter of the way: about noon
+        val m = c.ui.value.previewMinute
+        assertTrue(m != null && kotlin.math.abs(m - 12 * 60f) < 30f, "minute $m")
+    }
 }

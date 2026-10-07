@@ -52,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -78,9 +77,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -111,8 +112,8 @@ import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
 import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
 import io.github.plvzfqrit.plvinyl.ui.lighting.lightFrom
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
-import io.github.plvzfqrit.plvinyl.ui.lighting.shadow
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
+import io.github.plvzfqrit.plvinyl.ui.lighting.shadow
 import io.github.plvzfqrit.plvinyl.ui.paint.PaintCard
 import io.github.plvzfqrit.plvinyl.ui.paint.PaintTarget
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
@@ -192,7 +193,7 @@ fun TurntableScreen(
     // it's daytime, so you see the true colors.
     val light = if (painting != null) RoomLight() else ui.roomLight
     PhoneSettingsEffects(settings, lightRoom = deck.isLight && light.night < 0.5f, audible = ui.audible)
-    val roomLight = rememberRoomLight(light)
+    val roomLight = rememberRoomLight(light, instant = ui.previewMinute != null)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
         animator.spinDegPerSec = settings.spin.degPerSec * (disc?.size?.spinFactor ?: 1f)
@@ -598,9 +599,27 @@ fun TurntableScreen(
                     onSelectFinish = { vm.setLook(look.copy(finish = it)) },
                     onSettings = { new -> vm.updateSettings { new } },
                     onResetCrossfade = { ui.player?.let(vm::forgetCrossfade) },
+                    onPreviewDay = {
+                        showSettings = false                                // so you can watch
+                        vm.previewDay()
+                    },
                     onDismiss = { showSettings = false },
                 )
             }
+        }
+
+        // While a sped-up day plays: what time it is in it.
+        ui.previewMinute?.let { minute ->
+            Text(
+                text = clockLabel(minute),
+                color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+            )
         }
 
         // ---- Painting: the card on top, the real turntable as the preview.
@@ -743,6 +762,14 @@ private fun HeldLabel(
             .background((if (light) Color(0xFFF5F2ED) else Color(0xFF303030)).copy(alpha = 0.92f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )
+}
+
+/** "6:40 am" for a time of day in minutes. */
+private fun clockLabel(minute: Float): String {
+    val m = minute.toInt().mod(1440)
+    val h = m / 60
+    val h12 = if (h % 12 == 0) 12 else h % 12
+    return "%d:%02d %s".format(h12, m % 60, if (h < 12) "am" else "pm")
 }
 
 /** m:ss */

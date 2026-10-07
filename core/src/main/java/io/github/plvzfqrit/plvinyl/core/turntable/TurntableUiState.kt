@@ -30,4 +30,6 @@ data class TurntableUiState(
     val learnedCrossfadeMs: Long = 0L,
     /** The light in the room right now. */
     val roomLight: RoomLight = RoomLight(),
+    /** While a sped-up day is playing: its local time, minutes since midnight. */
+    val previewMinute: Float? = null,
 )

@@ -32,7 +32,11 @@ import kotlin.math.sin
  * Read the result inside draw lambdas, so a change redraws without recomposing.
  */
 @Composable
-fun rememberRoomLight(target: RoomLight): () -> RoomLight {
+fun rememberRoomLight(
+    target: RoomLight,
+    /** Follow [target] exactly, no fades (a sped-up day already moves smoothly). */
+    instant: Boolean = false,
+): () -> RoomLight {
     val golden = remember { Animatable(target.golden) }
     val night = remember { Animatable(target.night) }
     val late = remember { Animatable(target.late) }
@@ -46,7 +50,7 @@ fun rememberRoomLight(target: RoomLight): () -> RoomLight {
                 abs(target.golden - golden.value) > 0.05f || abs(target.late - late.value) > 0.05f ||
                 abs(target.dawn - dawn.value) > 0.05f || abs(target.sunHeight - height.value) > 0.1f ||
                 abs(toFrom - from.value) > 10f
-        if (fade) {
+        if (fade && !instant) {
             launch { golden.animateTo(target.golden, tween(1500)) }
             launch { late.animateTo(target.late, tween(1500)) }
             launch { dawn.animateTo(target.dawn, tween(1500)) }

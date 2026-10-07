@@ -106,6 +106,12 @@ class TurntableController(
     private var lightCheckedAt = Long.MIN_VALUE
     private var lightMode: LightingMode? = null
 
+    // ---- "Watch a day go by": the sun through 24 hours in a few seconds
+    private var previewStartedAt: Long? = null
+    private var previewFromWall = 0L
+    private var previewFromMinute = 0f
+    private var previewMinute: Float? = null
+
     // ---- Opening and coming back
     private sealed interface Phase {
         data object Stopped : Phase
@@ -153,8 +159,19 @@ class TurntableController(
         tick()
     }
 
+    /** Play the sun through a whole day, starting now (24 hours in [PREVIEW_DAY_MS]). */
+    fun previewDay() {
+        previewStartedAt = clock.nowMs()
+        previewFromWall = clock.wallMs()
+        previewFromMinute = clock.minuteOfDay()
+        tick()
+    }
+
     /** The app left the screen. */
     fun onStop() {
+        previewStartedAt = null
+        previewMinute = null
+        lightMode = null
         phase = Phase.Stopped
         // Whatever plays now is counted by the background (if that's on), not the needle.
         plays?.update(playedSong(), listening = false)
@@ -216,7 +233,21 @@ class TurntableController(
         if (audible()) playedMs += (now - lastTick).coerceAtLeast(0L)
         lastTick = now
         val mode = _settings.value.lighting
-        if (mode != lightMode || now - lightCheckedAt >= LIGHT_CHECK_MS) {
+        val preview = previewStartedAt
+        if (preview != null && now - preview >= PREVIEW_DAY_MS) {
+            previewStartedAt = null                          // the day is over: back to now
+            previewMinute = null
+            lightMode = null
+        }
+        if (previewStartedAt != null) {
+            // The sun's day, whatever the setting, sped up and recomputed every tick.
+            val elapsed = now - previewStartedAt!!
+            val wall = previewFromWall + elapsed * (DAY_MS / PREVIEW_DAY_MS)
+            val minute = (previewFromMinute + elapsed * 1440f / PREVIEW_DAY_MS) % 1440f
+            previewMinute = minute
+            val place = ZonePlaces.forZone(clock.zoneId(), clock.utcOffsetMs())
+            roomLight = LightingMode.Clock.lightAt(wall, minute, place)
+        } else if (mode != lightMode || now - lightCheckedAt >= LIGHT_CHECK_MS) {
             lightMode = mode
             lightCheckedAt = now
             // Where the sun is comes from the phone's time zone (re-read: you may have travelled).
@@ -393,6 +424,7 @@ class TurntableController(
             player = s?.player,
             learnedCrossfadeMs = s?.let { crossfade.leadFor(it.player) } ?: 0L,
             roomLight = roomLight,
+            previewMinute = previewMinute,
         )
     }
 
@@ -420,6 +452,9 @@ class TurntableController(
         const val ART_WAIT_MS = 1200L
         /** After dropping the needle by hand, hold it there this long while the player catches up. */
         const val DROP_HOLD_MS = 1500L
+        /** "Watch a day go by" plays a whole day in this long. */
+        const val PREVIEW_DAY_MS = 48_000L
+        private const val DAY_MS = 86_400_000L
         /** How often the room light follows the clock. */
         const val LIGHT_CHECK_MS = 30_000L
         /** A cue jump waits at most this long for the needle to lift. */

@@ -89,6 +89,8 @@ fun SettingsSheet(
     onSelectFinish: (VinylFinish) -> Unit,
     onSettings: (Settings) -> Unit,
     onResetCrossfade: () -> Unit,
+    /** Play the sun through a whole day, in under a minute. */
+    onPreviewDay: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -218,6 +220,17 @@ fun SettingsSheet(
                     },
                     fontSize = 12.sp,
                     color = fg.copy(alpha = 0.6f),
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "Watch a day go by",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .border(1.dp, fg.copy(alpha = 0.3f), RoundedCornerShape(50))
+                        .clickable(role = Role.Button) { tick(); onPreviewDay() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
 
                 Spacer(Modifier.height(14.dp))
