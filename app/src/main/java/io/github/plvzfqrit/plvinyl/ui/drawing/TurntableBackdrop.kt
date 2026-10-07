@@ -1,6 +1,9 @@
 package io.github.plvzfqrit.plvinyl.ui.drawing
 
+import android.content.res.Resources
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,7 +30,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import io.github.plvzfqrit.plvinyl.R
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -42,6 +47,7 @@ import kotlin.random.Random
  *  - Charcoal:  flat dark gray, a touch darker toward the bottom
  *  - Amber:     saturated orange that deepens toward the bottom
  *  - AlbumBlur: the current album art, heavily blurred and dimmed
+ *  - Walnut, Oak: real wood, oiled (CC0 veneer photos from Poly Haven; see tools/make_wood.py)
  *  - Custom:    your own paint (drawn live, so painting recolors it instantly)
  *
  * Colors are sampled from the reference screenshots.
@@ -51,11 +57,17 @@ enum class BackdropStyle(
     val baseColor: Int,
     /** Its front panel's main color (ARGB): where painting the panel starts from. */
     val panelColor: Int,
+    /** A light deck: dark text and icons on it. */
+    val isLight: Boolean = false,
+    /** The wood photo, for the wooden decks. */
+    @param:DrawableRes val wood: Int? = null,
 ) {
-    Paper(0xFFF0EDE8.toInt(), 0xFFC3C6C8.toInt()),          // ribbed aluminium
-    Charcoal(0xFF383838.toInt(), 0xFF212225.toInt()),       // ribbed gunmetal
-    Amber(0xFFEE991A.toInt(), 0xFF432914.toInt()),          // ribbed bronze-brown
-    AlbumBlur(0xFF383838.toInt(), 0xFF2C5F63.toInt()),      // tinted by the album
+    Paper(0xFFF0EDE8.toInt(), 0xFFC3C6C8.toInt(), isLight = true),      // ribbed aluminium
+    Charcoal(0xFF383838.toInt(), 0xFF212225.toInt()),                   // ribbed gunmetal
+    Amber(0xFFEE991A.toInt(), 0xFF432914.toInt()),                      // ribbed bronze-brown
+    AlbumBlur(0xFF383838.toInt(), 0xFF2C5F63.toInt()),                  // tinted by the album
+    Walnut(0xFF4E3525.toInt(), 0xFF2A211B.toInt(), wood = R.drawable.wood_walnut),             // ribbed dark bronze
+    Oak(0xFFCCAC80.toInt(), 0xFFC3C6C8.toInt(), isLight = true, wood = R.drawable.wood_oak),   // ribbed aluminium
     Custom(0xFF383838.toInt(), 0xFF212225.toInt()),
 }
 
@@ -76,6 +88,7 @@ fun TurntableBackdrop(
     deckPaint: Color? = null,
 ) {
     val density = LocalDensity.current
+    val resources = LocalContext.current.resources
 
     // Blurred art, made off the main thread, once per record. If the art is briefly
     // missing we keep the last one instead of flashing to gray.
@@ -106,7 +119,10 @@ fun TurntableBackdrop(
                 if (grain?.matches(w, h) != true) grain = withContext(Dispatchers.Default) { bakeGrain(w, h, density) }
                 Layer.Painted
             } else {
-                Layer.Baked(withContext(Dispatchers.Default) { bakeBackdrop(style, washImage, w, h, density) })
+                Layer.Baked(withContext(Dispatchers.Default) {
+                    val wood = style.wood?.let { decodeWood(resources, it) }
+                    bakeBackdrop(style, washImage, wood, w, h, density)
+                })
             }
             // If a fade was still running, keep whichever layer is mostly visible below.
             if (shown != null && (previous == null || fade.value >= 0.5f)) previous = shown
@@ -207,6 +223,10 @@ internal fun BackdropStyle.tonearmColors(): TonearmColors = when (this) {
         restPost = Color(0xFF1A1A1A), restClip = Color(0x66FFE2B0), restClipOutline = Color(0xFF9C650C),
     )
 
+    // Wood: the plate in the wood's own shades. A black arm on walnut, a white one on oak.
+    BackdropStyle.Walnut -> BackdropStyle.Amber.tonearmColors().withPlate(baseColor)
+    BackdropStyle.Oak -> BackdropStyle.Paper.tonearmColors().withPlate(baseColor)
+
     // Dark deck: the photo's slate-gray arm on a dark plate. (A painted deck starts from
     // this or the Paper set and shades the plate from its paint: see DeckColors.)
     BackdropStyle.Charcoal, BackdropStyle.AlbumBlur, BackdropStyle.Custom -> TonearmColors(
@@ -219,8 +239,12 @@ internal fun BackdropStyle.tonearmColors(): TonearmColors = when (this) {
     )
 }
 
+/** A wood photo. It's already screen-sized, so it's decoded as it is. */
+private fun decodeWood(resources: Resources, @DrawableRes id: Int): ImageBitmap? =
+    BitmapFactory.decodeResource(resources, id, BitmapFactory.Options().apply { inScaled = false })?.asImageBitmap()
+
 private fun bakeBackdrop(
-    style: BackdropStyle, wash: ImageBitmap?, w: Int, h: Int, density: Density,
+    style: BackdropStyle, wash: ImageBitmap?, wood: ImageBitmap?, w: Int, h: Int, density: Density,
 ): ImageBitmap {
     val bmp = ImageBitmap(w, h)
     CanvasDrawScope().draw(density, LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(bmp), Size(w.toFloat(), h.toFloat())) {
@@ -260,6 +284,18 @@ private fun bakeBackdrop(
                 drawGrain(lightAlpha = 0.04f, darkAlpha = 0.05f)
             }
 
+            BackdropStyle.Walnut, BackdropStyle.Oak -> {
+                if (wood != null) drawCover(wood, FilterQuality.High) else drawRect(Color(style.baseColor))
+                // Like the others, a little lighter at the top and deeper toward the front edge.
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.04f),
+                        0.55f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.16f),
+                    )
+                )
+            }
+
             // Drawn live instead (drawPaintedDeck); a plain fill if it's ever baked.
             BackdropStyle.Custom -> drawRect(Color(BackdropStyle.Custom.baseColor))
 
@@ -267,16 +303,8 @@ private fun bakeBackdrop(
                 if (wash == null) {
                     drawRect(Color(0xFF383838))                   // no art yet: charcoal
                 } else {
-                    // Stretch the tiny blurred art to cover the screen (center-crop).
-                    val scale = maxOf(size.width / wash.width, size.height / wash.height)
-                    val dw = (wash.width * scale).roundToInt()
-                    val dh = (wash.height * scale).roundToInt()
-                    drawImage(
-                        wash,
-                        dstOffset = IntOffset((w - dw) / 2, (h - dh) / 2),
-                        dstSize = IntSize(dw, dh),
-                        filterQuality = FilterQuality.Low,           // bilinear = smooth
-                    )
+                    // Stretch the tiny blurred art to cover the screen (bilinear = smooth).
+                    drawCover(wash, FilterQuality.Low)
                 }
                 // Dim it, more toward the bottom, so white text stays readable.
                 drawRect(
@@ -291,6 +319,19 @@ private fun bakeBackdrop(
         }
     }
     return bmp
+}
+
+/** [image] scaled to cover the whole area, centered (the overflow is cropped). */
+private fun DrawScope.drawCover(image: ImageBitmap, quality: FilterQuality) {
+    val scale = maxOf(size.width / image.width, size.height / image.height)
+    val dw = (image.width * scale).roundToInt()
+    val dh = (image.height * scale).roundToInt()
+    drawImage(
+        image,
+        dstOffset = IntOffset(((size.width - dw) / 2).roundToInt(), ((size.height - dh) / 2).roundToInt()),
+        dstSize = IntSize(dw, dh),
+        filterQuality = quality,
+    )
 }
 
 /** Fine, static film/paper grain. Fixed seed, so it never flickers. */

@@ -1,7 +1,9 @@
 package io.github.plvzfqrit.plvinyl.ui.settings
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.view.HapticFeedbackConstants
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,11 +43,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -126,22 +130,25 @@ fun SettingsSheet(
             item { Column(Modifier.fillMaxWidth()) {
                 // ---------------- Look ----------------
                 SectionTitle("Background")
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    BackdropStyle.entries.forEach { style ->
-                        BackdropSwatch(
-                            style = style,
-                            art = art,
-                            paint = deckPaint,
-                            selected = style == current,
-                            ringColor = fg,
-                            onClick = {
-                                tick()
-                                if (style == BackdropStyle.Custom) onPaint() else onSelect(style)
-                            },
-                        )
+                // Four to a row, in columns (the last row's gaps stay empty).
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BackdropStyle.entries.chunked(4).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            row.forEach { style ->
+                                BackdropSwatch(
+                                    style = style,
+                                    art = art,
+                                    paint = deckPaint,
+                                    selected = style == current,
+                                    ringColor = fg,
+                                    onClick = {
+                                        tick()
+                                        if (style == BackdropStyle.Custom) onPaint() else onSelect(style)
+                                    },
+                                )
+                            }
+                            repeat(4 - row.size) { Spacer(Modifier.width(SWATCH_WIDTH)) }
+                        }
                     }
                 }
 
@@ -372,6 +379,21 @@ private fun SunTimeRow(held: Int?, fg: Color, onSet: () -> Unit) {
     }
 }
 
+/** A background swatch's width: the widest name ("Album blur") fits under it. */
+private val SWATCH_WIDTH = 68.dp
+
+/** A small copy of a wood photo, for its swatch: decoded at 1/8 size, off the main thread. */
+@Composable
+private fun rememberWoodThumb(@DrawableRes id: Int?): ImageBitmap? {
+    val resources = LocalContext.current.resources
+    val thumb by produceState<ImageBitmap?>(null, id) {
+        if (id != null) value = withContext(Dispatchers.IO) {
+            BitmapFactory.decodeResource(resources, id, BitmapFactory.Options().apply { inSampleSize = 8 })?.asImageBitmap()
+        }
+    }
+    return thumb
+}
+
 @Composable
 private fun SectionTitle(text: String) {
     Spacer(Modifier.height(24.dp))
@@ -496,11 +518,14 @@ private fun BackdropSwatch(
         BackdropStyle.Charcoal -> "Charcoal"
         BackdropStyle.Amber -> "Amber"
         BackdropStyle.AlbumBlur -> "Album blur"
+        BackdropStyle.Walnut -> "Walnut"
+        BackdropStyle.Oak -> "Oak"
         BackdropStyle.Custom -> "Custom"
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .width(SWATCH_WIDTH)
             .semantics { contentDescription = "$name background" }
             .clickable(role = Role.RadioButton, onClick = onClick),
     ) {
@@ -522,7 +547,7 @@ private fun BackdropSwatch(
                 )
                 BackdropStyle.AlbumBlur -> {
                     // Shrunk off the main thread (the art can be 1000+ px).
-                    val thumb by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, art) {
+                    val thumb by produceState<ImageBitmap?>(null, art) {
                         value = withContext(Dispatchers.Default) {
                             art?.let { Bitmap.createScaledBitmap(it, 8, 8, true).asImageBitmap() }
                         }
@@ -542,6 +567,21 @@ private fun BackdropSwatch(
                                 Brush.linearGradient(listOf(Color(0xFF6F929F), Color(0xFF434442)))
                             )
                         )
+                    }
+                }
+                // The wood itself (a small copy, made off the main thread).
+                BackdropStyle.Walnut, BackdropStyle.Oak -> {
+                    val wood = rememberWoodThumb(style.wood)
+                    if (wood != null) {
+                        Image(
+                            bitmap = wood,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            filterQuality = FilterQuality.High,
+                            modifier = Modifier.size(50.dp),
+                        )
+                    } else {
+                        Box(Modifier.size(50.dp).background(Color(style.baseColor)))
                     }
                 }
                 // Your paint, with a palette printed on it.

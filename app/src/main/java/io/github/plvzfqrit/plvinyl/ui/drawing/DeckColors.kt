@@ -50,7 +50,7 @@ fun Look.deckColors(): DeckColors {
             panelPaint = Color(panelPaint ?: matchingPanel),
         )
     }
-    val light = backdrop == BackdropStyle.Paper
+    val light = backdrop.isLight
     return DeckColors(
         style = backdrop,
         deck = null,
@@ -62,10 +62,13 @@ fun Look.deckColors(): DeckColors {
 }
 
 /** The arm on a painted deck: its plate in shades of the paint, the arm parts light or dark to suit. */
-private fun paintedTonearm(paint: Int, light: Boolean): TonearmColors {
-    fun shade(dl: Float) = Color(Paint.shade(paint, dl))
-    val base = (if (light) BackdropStyle.Paper else BackdropStyle.Charcoal).tonearmColors()
-    return base.copy(
+private fun paintedTonearm(paint: Int, light: Boolean): TonearmColors =
+    (if (light) BackdropStyle.Paper else BackdropStyle.Charcoal).tonearmColors().withPlate(paint)
+
+/** These arm colors with the plate (the disc the arm stands on) in shades of [color] (ARGB). */
+internal fun TonearmColors.withPlate(color: Int): TonearmColors {
+    fun shade(dl: Float) = Color(Paint.shade(color, dl))
+    return copy(
         plateLight = shade(+0.04f), plateDark = shade(-0.02f),
         plateOutline = shade(-0.18f), innerRing = shade(-0.10f),
         slotFill = shade(+0.02f), slotOutline = shade(-0.14f),

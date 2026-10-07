@@ -68,7 +68,8 @@ import kotlin.math.max
  * Each background gets its own front material, so the face reads as the edge of
  * the plinth rather than more of the top:
  *   Paper → ribbed aluminium · Charcoal → ribbed gunmetal ·
- *   Amber → ribbed bronze-brown · Album Blur → ribbed, album-tinted
+ *   Amber → ribbed bronze-brown · Album Blur → ribbed, album-tinted ·
+ *   Walnut → ribbed dark bronze · Oak → ribbed aluminium
  */
 
 /** Height of the panel above the navigation bar (lip + face). */
@@ -162,6 +163,9 @@ private fun lipBrush(style: BackdropStyle, album: Pair<Color, Color>): Brush = w
     BackdropStyle.Paper -> Brush.verticalGradient(listOf(Color(0xFFF7F4EE), Color(0xFFE3DED5)))
     BackdropStyle.Charcoal -> Brush.verticalGradient(listOf(Color(0xFF3A3A3A), Color(0xFF2C2C2C)))
     BackdropStyle.Amber -> Brush.verticalGradient(listOf(Color(0xFF5A3A1C), Color(0xFF432A14)))
+    // The wooden plinth's oiled edge.
+    BackdropStyle.Walnut -> Brush.verticalGradient(listOf(Color(0xFF5C3F2B), Color(0xFF3A281C)))
+    BackdropStyle.Oak -> Brush.verticalGradient(listOf(Color(0xFFDCC096), Color(0xFFBF9F72)))
     BackdropStyle.AlbumBlur -> {
         val (a, b) = album
         Brush.horizontalGradient(listOf(lerp(a, Color.White, 0.12f), lerp(b, Color.White, 0.12f)))
@@ -209,7 +213,7 @@ private fun faceTexture(
         hi = 0.10f + 0.45f * l
         sh = 0.55f - 0.33f * l
     } else when (style) {
-        BackdropStyle.Paper -> {            // ribbed aluminium
+        BackdropStyle.Paper, BackdropStyle.Oak -> {     // ribbed aluminium
             base = Brush.verticalGradient(0f to Color(0xFFDCDEDF), 0.55f to Color(0xFFC3C6C8), 1f to Color(0xFFAEB1B3))
             hi = 0.55f; sh = 0.22f
         }
@@ -220,6 +224,10 @@ private fun faceTexture(
         BackdropStyle.Amber -> {            // ribbed bronze-brown
             base = Brush.verticalGradient(0f to Color(0xFF5A3A1E), 0.55f to Color(0xFF432914), 1f to Color(0xFF2E1C0D))
             hi = 0.10f; sh = 0.50f
+        }
+        BackdropStyle.Walnut -> {           // ribbed dark bronze
+            base = Brush.verticalGradient(0f to Color(0xFF3F332A), 0.55f to Color(0xFF2A211B), 1f to Color(0xFF1A1511))
+            hi = 0.12f; sh = 0.50f
         }
         BackdropStyle.AlbumBlur -> {        // ribbed, tinted by the album
             val (a, b) = album

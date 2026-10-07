@@ -16,9 +16,10 @@ No ads, no account, no internet permission. Everything stays on your phone.
   land on gets a record swap.
 - **Grab the arm** and drop it anywhere to cue that point in the song, or **swipe the
   record** to change songs.
-- **7" singles and 12" LPs**, picked from the song's length. Four backgrounds (or your
-  own paint), four vinyl finishes (including marbled vinyl coloured from the album
-  art), and record wear that builds up the more you play something.
+- **7" singles and 12" LPs**, picked from the song's length. Six backgrounds, two of
+  them real oiled wood (walnut and oak), or your own paint; four vinyl finishes
+  (including marbled vinyl coloured from the album art); and record wear that builds up
+  the more you play something.
 - **Paint it.** Give the deck and the front panel your own colors: hand-picked hi-fi
   paints in one tap, or any color with hue / saturation / lightness sliders, previewed
   live on the turntable itself.
@@ -68,7 +69,7 @@ Two Gradle modules:
 ./gradlew :core:test
 ```
 
-126 unit tests run on the JVM in a few seconds, with no device or emulator needed.
+Over 170 unit tests run on the JVM in a few seconds, with no device or emulator needed.
 Many of them are regression tests named after a bug the first version had, for example
 *"a seek lifts the needle first and never swings it across the record"* and *"a
 notification sound or a paused Chrome tab doesn't steal the session"*.
@@ -87,3 +88,10 @@ shares what's playing. If the switch is greyed out (Android does that for apps
 installed outside the Play Store), open App info → ⋮ → *Allow restricted settings*.
 
 YouTube (the video app) only shares what's playing with Premium; YouTube Music works.
+
+## Credits
+
+- Walnut and oak: CC0 veneer scans from [Poly Haven](https://polyhaven.com)
+  (*Black Walnut Veneer 02* and *Red Oak Veneer*), cropped and given an oiled finish by
+  [`tools/make_wood.py`](tools/make_wood.py).
+- Where the sun is: the reference cities in the tz database's `zone.tab` (public domain).

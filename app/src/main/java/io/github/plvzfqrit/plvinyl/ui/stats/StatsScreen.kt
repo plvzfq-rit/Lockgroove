@@ -119,33 +119,38 @@ fun DeckColors.statsColors(): StatsColors {
             accent = Color.White, series1 = Color.White, series2 = Color(0xFF4A2300),
             other = Color.White.copy(alpha = 0.45f), chipOnText = Color(0xFFB86A0C),
         )
-        // A painted deck: the text color that reads on the paint, bars in that color too
-        // (any accent could clash with the paint), and the paint itself on the chips.
-        BackdropStyle.Custom -> {
-            val paint = deck ?: Color(0xFF383838)
-            val second = Color(Paint.shade(paint.toArgb(), if (isLight) -0.32f else +0.30f))
-            if (isLight) StatsColors(
-                textPrimary = fg, textSecondary = fg.copy(alpha = 0.72f), textMuted = fg.copy(alpha = 0.5f),
-                card = Color.Black.copy(alpha = 0.06f), line = Color.Black.copy(alpha = 0.12f),
-                track = Color.Black.copy(alpha = 0.08f),
-                accent = fg, series1 = fg, series2 = second,
-                other = fg.copy(alpha = 0.35f), chipOnText = paint,
-            ) else StatsColors(
-                textPrimary = Color(0xFFF3EFE7), textSecondary = Color(0xFFC3C2B7), textMuted = Color(0xFF9D9B92),
-                card = Color.Black.copy(alpha = 0.22f), line = Color.White.copy(alpha = 0.16f),
-                track = Color.White.copy(alpha = 0.1f),
-                accent = Color(0xFFF3EFE7), series1 = Color(0xFFF3EFE7), series2 = second,
-                other = Color.White.copy(alpha = 0.35f), chipOnText = paint,
-            )
-        }
+        BackdropStyle.Custom -> paintedStats(deck ?: Color(0xFF383838), isLight, fg)
+        // Honey-colored oak hides colored bars (like a paint would): ink on wood instead.
+        BackdropStyle.Oak -> paintedStats(Color(style.baseColor), isLight = true, fg)
         else -> darkStats(albumBlur = style == BackdropStyle.AlbumBlur)
     }
+}
+
+/**
+ * A painted deck: the text color that reads on the paint, bars in that color too
+ * (any accent could clash with the paint), and the paint itself on the chips.
+ */
+private fun paintedStats(paint: Color, isLight: Boolean, fg: Color): StatsColors {
+    val second = Color(Paint.shade(paint.toArgb(), if (isLight) -0.32f else +0.30f))
+    return if (isLight) StatsColors(
+        textPrimary = fg, textSecondary = fg.copy(alpha = 0.72f), textMuted = fg.copy(alpha = 0.5f),
+        card = Color.Black.copy(alpha = 0.06f), line = Color.Black.copy(alpha = 0.12f),
+        track = Color.Black.copy(alpha = 0.08f),
+        accent = fg, series1 = fg, series2 = second,
+        other = fg.copy(alpha = 0.35f), chipOnText = paint,
+    ) else StatsColors(
+        textPrimary = Color(0xFFF3EFE7), textSecondary = Color(0xFFC3C2B7), textMuted = Color(0xFF9D9B92),
+        card = Color.Black.copy(alpha = 0.22f), line = Color.White.copy(alpha = 0.16f),
+        track = Color.White.copy(alpha = 0.1f),
+        accent = Color(0xFFF3EFE7), series1 = Color(0xFFF3EFE7), series2 = second,
+        other = Color.White.copy(alpha = 0.35f), chipOnText = paint,
+    )
 }
 
 /** The stats in the dark room, whatever the background. */
 val NightStatsColors: StatsColors = darkStats(albumBlur = false)
 
-/** Charcoal and the album blur (cards are darker so charts read on any art). */
+/** Charcoal, walnut and the album blur (cards are darker so charts read on any art). */
 private fun darkStats(albumBlur: Boolean) = StatsColors(
     textPrimary = Color(0xFFF3EFE7), textSecondary = Color(0xFFC3C2B7), textMuted = Color(0xFF9D9B92),
     card = Color.Black.copy(alpha = if (albumBlur) 0.32f else 0.22f),
