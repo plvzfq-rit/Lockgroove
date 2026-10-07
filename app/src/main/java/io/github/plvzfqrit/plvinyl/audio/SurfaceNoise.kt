@@ -3,6 +3,7 @@ package io.github.plvzfqrit.plvinyl.audio
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.os.Build
 import android.os.Process
 import android.util.Log
 import io.github.plvzfqrit.plvinyl.core.audio.CrackleGenerator
@@ -54,7 +55,7 @@ class SurfaceNoise {
         Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
         val track = try {
             val minBuf = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT)
-            AudioTrack.Builder()
+            val builder = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -68,9 +69,14 @@ class SurfaceNoise {
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .build()
                 )
-                .setBufferSizeInBytes(max(minBuf, RATE / 8 * 4))       // ~125 ms
+                .setBufferSizeInBytes(max(minBuf, RATE / 4 * 4))       // ~250 ms
                 .setTransferMode(AudioTrack.MODE_STREAM)
-                .build()
+            // The power-saving path: big buffers, few wakeups. (A crackle a beat late is
+            // fine; the music itself takes a moment to start after the needle drops.)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_POWER_SAVING)
+            }
+            builder.build()
         } catch (e: Exception) {
             Log.w("SurfaceNoise", "couldn't open an audio stream", e)
             synchronized(lock) { if (generation == gen) worker = null }
@@ -78,7 +84,7 @@ class SurfaceNoise {
         }
 
         val synth = CrackleGenerator(RATE)
-        val buf = FloatArray(512)
+        val buf = FloatArray(2048)                      // ~46 ms a write: fewer wakeups
         var quietSamples = 0
         try {
             track.play()
