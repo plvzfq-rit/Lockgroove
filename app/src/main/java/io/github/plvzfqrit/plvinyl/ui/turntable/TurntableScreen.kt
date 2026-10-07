@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,6 +87,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.plvzfqrit.plvinyl.audio.SurfaceNoise
 import io.github.plvzfqrit.plvinyl.core.history.Wear
+import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
 import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
@@ -93,20 +96,23 @@ import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.UserIntent
 import io.github.plvzfqrit.plvinyl.core.ui.PageSwipe
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
+import io.github.plvzfqrit.plvinyl.ui.drawing.Look
 import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
-import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
+import io.github.plvzfqrit.plvinyl.ui.drawing.deckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmArmForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.drawTonearmBaseForPlatter
 import io.github.plvzfqrit.plvinyl.ui.drawing.extractVinylPalette
-import io.github.plvzfqrit.plvinyl.ui.drawing.deckColors
+import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
 import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
 import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
+import io.github.plvzfqrit.plvinyl.ui.paint.PaintCard
+import io.github.plvzfqrit.plvinyl.ui.paint.PaintTarget
 import io.github.plvzfqrit.plvinyl.ui.settings.SettingsSheet
 import io.github.plvzfqrit.plvinyl.ui.stats.NightStatsColors
 import io.github.plvzfqrit.plvinyl.ui.stats.StatsScreen
@@ -114,7 +120,9 @@ import io.github.plvzfqrit.plvinyl.ui.stats.statsColors
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The turntable. The controller (in the view model) decides; the animator performs
@@ -133,7 +141,20 @@ fun TurntableScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val arts by vm.art.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
-    val look by vm.look.collectAsStateWithLifecycle()
+    val saved by vm.look.collectAsStateWithLifecycle()
+    // Painting: the card at the top, and the screen showing the paint being chosen (a
+    // draft) instead of the saved look. Done saves it; back throws it away.
+    var painting by remember { mutableStateOf<PaintTarget?>(null) }
+    var draft by remember { mutableStateOf<Look?>(null) }
+    val look = draft ?: saved
+    // After Done, keep showing the paint until the saved look has caught up (saving takes
+    // a moment), so the old colors don't flash back for a frame.
+    LaunchedEffect(painting, draft) {
+        val d = draft ?: return@LaunchedEffect
+        if (painting != null) return@LaunchedEffect
+        withTimeoutOrNull(2_000) { vm.look.first { it == d } }
+        draft = null
+    }
     val backdrop = look.backdrop
     val deck = remember(look) { look.deckColors() }
     var showSettings by remember { mutableStateOf(false) }
@@ -165,9 +186,11 @@ fun TurntableScreen(
     val disc = animator.disc
     val art = disc?.let { arts[it.key] }
 
-    PhoneSettingsEffects(settings, lightRoom = deck.isLight && ui.roomLight.night < 0.5f, audible = ui.audible)
-    // Room lighting by the clock (or always day / night, from settings).
-    val roomLight = rememberRoomLight(ui.roomLight)
+    // Room lighting by the clock (or always day / night, from settings). While painting
+    // it's daytime, so you see the true colors.
+    val light = if (painting != null) RoomLight() else ui.roomLight
+    PhoneSettingsEffects(settings, lightRoom = deck.isLight && light.night < 0.5f, audible = ui.audible)
+    val roomLight = rememberRoomLight(light)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
         animator.spinDegPerSec = settings.spin.degPerSec * (disc?.size?.spinFactor ?: 1f)
@@ -202,10 +225,10 @@ fun TurntableScreen(
     // it coasts to a stop and the app stops redrawing. Any touch or music wakes it.
     var coverClosed by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(settings.dustCover, ui.playing, lastTouch, ui.title, showSettings) {
+    LaunchedEffect(settings.dustCover, ui.playing, lastTouch, ui.title, showSettings, painting) {
         animator.motorOn = true
         if (!settings.dustCover) coverClosed = false
-        if (ui.playing || showSettings) {
+        if (ui.playing || showSettings || painting != null) {
             coverClosed = false
             return@LaunchedEffect
         }
@@ -241,6 +264,7 @@ fun TurntableScreen(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    if (painting != null) return@awaitEachGesture             // no stats while painting
                     val startP = statsProgress.value
                     val startedOpen = PageSwipe.startsOpen(startP)
                     var dx = 0f
@@ -286,6 +310,7 @@ fun TurntableScreen(
         val spindleY = platterTop + platterRadius
         val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val panelHeight = FRONT_PANEL_HEIGHT + navInset
+        val panelTop = with(screenDensity) { (screenHeight - panelHeight).toPx() }
         val armColors = deck.tonearm
 
         // The lamp hangs over the record's resting place.
@@ -485,7 +510,7 @@ fun TurntableScreen(
                 // Title/artist fade to the new song. Long ones scroll (marquee).
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
-                        val text = litTextColor(deck.contentColor, ui.roomLight)
+                        val text = litTextColor(deck.contentColor, light)
                         MarqueeText(t, text, MaterialTheme.typography.headlineMedium)
                         if (a != null) {
                             MarqueeText(a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
@@ -499,7 +524,6 @@ fun TurntableScreen(
             // place, needle hovers) · ↻1 repeat one · ▶▶| next.
             // It takes the room's light itself (so its keys stay readable and lit keys glow).
             val panelPalette = remember(art) { art?.let(::extractVinylPalette) }
-            val panelTop = with(screenDensity) { (screenHeight - panelHeight).toPx() }
             FrontPanel(
                 style = backdrop,
                 albumPalette = panelPalette,
@@ -538,13 +562,60 @@ fun TurntableScreen(
                     settings = settings,
                     learnedCrossfadeMs = ui.learnedCrossfadeMs,
                     // Going Custom keeps the paint (or starts from the current background's color).
-                    onSelect = { vm.setLook(look.copy(backdrop = it, deckPaint = look.deckPaintOrSeed)) },
+                    onSelect = { vm.setLook(look.copy(backdrop = it)) },
+                    onPaint = { customDeck ->
+                        showSettings = false
+                        // Going Custom starts from the paint so far (or the current background's color).
+                        draft = if (customDeck) saved.copy(backdrop = BackdropStyle.Custom, deckPaint = saved.deckPaintOrSeed)
+                        else saved
+                        painting = PaintTarget.Deck
+                    },
                     onSelectFinish = { vm.setLook(look.copy(finish = it)) },
                     onSettings = { new -> vm.updateSettings { new } },
                     onResetCrossfade = { ui.player?.let(vm::forgetCrossfade) },
                     onDismiss = { showSettings = false },
                 )
             }
+        }
+
+        // ---- Painting: the card on top, the real turntable as the preview.
+        painting?.let { target ->
+            // Taps on the turntable choose what to paint; nothing else reacts meanwhile.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(panelTop) {
+                        detectTapGestures { p -> painting = if (p.y >= panelTop) PaintTarget.Panel else PaintTarget.Deck }
+                    }
+            )
+            BackHandler { draft = null; painting = null }
+            PaintCard(
+                target = target,
+                onTarget = { painting = it },
+                color = when (target) {
+                    PaintTarget.Deck -> look.deckPaint.takeIf { look.backdrop == BackdropStyle.Custom }
+                    PaintTarget.Panel -> look.panelPaint
+                },
+                matchColor = when (target) {
+                    PaintTarget.Deck -> look.deckPaintOrSeed
+                    PaintTarget.Panel -> look.matchingPanel
+                },
+                onColor = { c ->
+                    draft = when (target) {
+                        PaintTarget.Deck -> look.copy(backdrop = BackdropStyle.Custom, deckPaint = c ?: look.deckPaintOrSeed)
+                        PaintTarget.Panel -> look.copy(panelPaint = c)
+                    }
+                },
+                onDone = {
+                    draft?.let(vm::setLook)
+                    painting = null
+                },
+                tick = { if (settings.haptics) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
         }
 
         if (statsOnScreen) {

@@ -15,6 +15,10 @@ data class Look(
 ) {
     /** The deck paint to use or start from: the saved one, else the current background's color. */
     val deckPaintOrSeed: Int get() = deckPaint ?: backdrop.baseColor
+
+    /** What the front panel looks like when it matches the background (as one color). */
+    val matchingPanel: Int
+        get() = if (backdrop == BackdropStyle.Custom) Paint.shade(deckPaintOrSeed, -0.12f) else backdrop.panelColor
 }
 
 /** Every color the deck needs, resolved from the look in one place. */
@@ -43,7 +47,7 @@ fun Look.deckColors(): DeckColors {
             isLight = light,
             tonearm = paintedTonearm(paint, light),
             // Matching: the plinth's front edge, in its own shade.
-            panelPaint = Color(panelPaint ?: Paint.shade(paint, -0.12f)),
+            panelPaint = Color(panelPaint ?: matchingPanel),
         )
     }
     val light = backdrop == BackdropStyle.Paper

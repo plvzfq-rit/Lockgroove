@@ -47,14 +47,16 @@ import kotlin.random.Random
  * Colors are sampled from the reference screenshots.
  */
 enum class BackdropStyle(
-    /** The background's main color (ARGB): where painting starts from. */
+    /** The background's main color (ARGB): where painting the deck starts from. */
     val baseColor: Int,
+    /** Its front panel's main color (ARGB): where painting the panel starts from. */
+    val panelColor: Int,
 ) {
-    Paper(0xFFF0EDE8.toInt()),
-    Charcoal(0xFF383838.toInt()),
-    Amber(0xFFEE991A.toInt()),
-    AlbumBlur(0xFF383838.toInt()),
-    Custom(0xFF383838.toInt()),
+    Paper(0xFFF0EDE8.toInt(), 0xFFC3C6C8.toInt()),          // ribbed aluminium
+    Charcoal(0xFF383838.toInt(), 0xFF212225.toInt()),       // ribbed gunmetal
+    Amber(0xFFEE991A.toInt(), 0xFF432914.toInt()),          // ribbed bronze-brown
+    AlbumBlur(0xFF383838.toInt(), 0xFF2C5F63.toInt()),      // tinted by the album
+    Custom(0xFF383838.toInt(), 0xFF212225.toInt()),
 }
 
 /** What's on screen: a baked background, or the painted deck drawn live. */

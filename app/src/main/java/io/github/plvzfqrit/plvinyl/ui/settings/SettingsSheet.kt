@@ -84,6 +84,8 @@ fun SettingsSheet(
     settings: Settings,
     learnedCrossfadeMs: Long,
     onSelect: (BackdropStyle) -> Unit,
+    /** Paint the deck or front panel. [customDeck]: start on the Custom background. */
+    onPaint: (customDeck: Boolean) -> Unit,
     onSelectFinish: (VinylFinish) -> Unit,
     onSettings: (Settings) -> Unit,
     onResetCrossfade: () -> Unit,
@@ -127,10 +129,24 @@ fun SettingsSheet(
                             paint = deckPaint,
                             selected = style == current,
                             ringColor = fg,
-                            onClick = { tick(); onSelect(style) },
+                            onClick = {
+                                tick()
+                                if (style == BackdropStyle.Custom) onPaint(true) else onSelect(style)
+                            },
                         )
                     }
                 }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "Paint the deck and front panel…",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .border(1.dp, fg.copy(alpha = 0.3f), RoundedCornerShape(50))
+                        .clickable(role = Role.Button) { tick(); onPaint(false) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                )
 
             } }
             item { Column(Modifier.fillMaxWidth()) {
