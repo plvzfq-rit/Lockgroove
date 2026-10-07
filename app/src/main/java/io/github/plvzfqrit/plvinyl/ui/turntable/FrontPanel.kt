@@ -327,18 +327,20 @@ private fun Key(
             val h = size.height - 3.dp.toPx()
             val corner = CornerRadius(6.dp.toPx())
             // On: a ring of amber light around the key, faint by day, glowing at night.
-            // (Drawn first: the cap covers its inner half, so it reads as light around the edge.)
+            // (Drawn first: the key covers its inner half, so it reads as light around the
+            // edge.) It goes round the whole key, the cap and the dark base showing under it.
             if (glow > 0f) {
                 val ring = glow * (0.35f + 0.65f * n)
                 val grow = 2.dp.toPx()
+                val keyH = h + 3.dp.toPx() * (1f - press)
                 drawRoundRect(
                     Glow.copy(alpha = 0.22f * ring),
-                    Offset(-grow, travel - grow), Size(size.width + 2 * grow, h + 2 * grow),
+                    Offset(-grow, travel - grow), Size(size.width + 2 * grow, keyH + 2 * grow),
                     CornerRadius(corner.x + grow), style = Stroke(5.dp.toPx()),
                 )
                 drawRoundRect(
                     Glow.copy(alpha = 0.75f * ring),
-                    Offset(-grow / 2, travel - grow / 2), Size(size.width + grow, h + grow),
+                    Offset(-grow / 2, travel - grow / 2), Size(size.width + grow, keyH + grow),
                     CornerRadius(corner.x + grow / 2), style = Stroke(1.5.dp.toPx()),
                 )
             }
