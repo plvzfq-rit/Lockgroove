@@ -54,10 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.plvzfqrit.plvinyl.AndroidClock
 import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
-import io.github.plvzfqrit.plvinyl.core.lighting.ZonePlaces
-import io.github.plvzfqrit.plvinyl.core.lighting.sunLight
 import io.github.plvzfqrit.plvinyl.core.look.Paint
 import io.github.plvzfqrit.plvinyl.core.model.RecordSizeChoice
 import io.github.plvzfqrit.plvinyl.core.settings.EndMargin
@@ -65,15 +62,12 @@ import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.settings.SpinSpeed
 import io.github.plvzfqrit.plvinyl.core.settings.SurfaceNoiseLevel
-import io.github.plvzfqrit.plvinyl.ui.common.GradientSlider
 import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylPalette
 import io.github.plvzfqrit.plvinyl.ui.drawing.rememberFinishPreview
-import io.github.plvzfqrit.plvinyl.ui.lighting.skyColor
 import io.github.plvzfqrit.plvinyl.ui.lighting.timeOfDayLabel
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -101,6 +95,8 @@ fun SettingsSheet(
     onResetCrossfade: () -> Unit,
     /** Play the sun through a whole day, in under a minute. */
     onPreviewDay: () -> Unit,
+    /** Choose a time of day for the sun, on a card over the deck. */
+    onSetTime: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -223,7 +219,7 @@ fun SettingsSheet(
                 )
                 if (settings.lighting == LightingMode.Clock) {
                     Spacer(Modifier.height(12.dp))
-                    SunTimeRow(settings.sunTime, fg, tick) { onSettings(settings.copy(sunTime = it)) }
+                    SunTimeRow(settings.sunTime, fg) { tick(); onSetTime() }
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -358,52 +354,33 @@ fun SettingsSheet(
     }
 }
 
-/**
- * Hold the sun at a time of day, or follow the clock (Now). The track is today's sky
- * where you are: dark until sunrise, peach at dawn, daylight, gold before sunset.
- */
+/** "Time of day: Now · Set…": opens the time card over the deck. */
 @Composable
-private fun SunTimeRow(held: Int?, fg: Color, tick: () -> Unit, onHold: (Int?) -> Unit) {
-    val now = AndroidClock.minuteOfDay()
-    val sky = remember {
-        val place = ZonePlaces.forZone(AndroidClock.zoneId(), AndroidClock.utcOffsetMs())
-        val midnight = AndroidClock.wallMs() - (now * 60_000).toLong()
-        List(49) { i ->
-            val minute = i * 30f
-            sunLight(midnight + (minute * 60_000).toLong(), minute, place).skyColor()
+private fun SunTimeRow(held: Int?, fg: Color, onSet: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onSet)
+            .padding(vertical = 6.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Time of day", fontSize = 15.sp)
+            Text(
+                text = if (held == null) "Now: follows the clock" else "Held at ${timeOfDayLabel(held.toFloat())}",
+                fontSize = 12.sp, color = fg.copy(alpha = 0.6f),
+            )
         }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Time of day", fontSize = 15.sp, modifier = Modifier.weight(1f))
         Text(
-            text = timeOfDayLabel(held?.toFloat() ?: now),
-            fontSize = 13.sp,
-            color = fg.copy(alpha = 0.7f),
-        )
-        Spacer(Modifier.width(10.dp))
-        val on = held == null
-        Text(
-            text = "Now",
-            fontSize = 13.sp,
-            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (on) (if (fg.luminance() > 0.5f) Color(0xFF242424) else Color.White) else fg,
+            text = "Set…",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier
-                .semantics { selected = on }
                 .clip(RoundedCornerShape(50))
-                .background(if (on) fg else Color.Transparent)
-                .border(1.dp, fg.copy(alpha = if (on) 1f else 0.3f), RoundedCornerShape(50))
-                .clickable(role = Role.RadioButton) { tick(); onHold(null) }
-                .padding(horizontal = 12.dp, vertical = 5.dp),
+                .border(1.dp, fg.copy(alpha = 0.3f), RoundedCornerShape(50))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
         )
     }
-    GradientSlider(
-        value = (held?.toFloat() ?: now) / 1440f,
-        // Five-minute steps, like a clock you'd set.
-        onValueChange = { v -> onHold(((v * 1440f).roundToInt() / 5 * 5).coerceIn(0, 1435)) },
-        stops = sky,
-        label = "Time of day",
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 @Composable

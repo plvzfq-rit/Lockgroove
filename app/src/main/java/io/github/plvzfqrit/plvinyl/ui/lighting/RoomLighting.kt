@@ -43,7 +43,10 @@ fun rememberRoomLight(
     target: RoomLight,
     /** A sped-up day playing: its light is worked out at every frame instead. */
     preview: DayPreview? = null,
+    /** A slider is moving the light: big changes keep up with it instead of fading slowly. */
+    following: Boolean = false,
 ): () -> RoomLight {
+    val fadeMs = if (following) FOLLOW_MS else FADE_MS
     val golden = remember { Animatable(target.golden) }
     val night = remember { Animatable(target.night) }
     val late = remember { Animatable(target.late) }
@@ -58,12 +61,12 @@ fun rememberRoomLight(
                 abs(target.dawn - dawn.value) > 0.05f || abs(target.sunHeight - height.value) > 0.1f ||
                 abs(toFrom - from.value) > 10f
         if (fade) {
-            launch { golden.animateTo(target.golden, tween(1500)) }
-            launch { late.animateTo(target.late, tween(1500)) }
-            launch { dawn.animateTo(target.dawn, tween(1500)) }
-            launch { height.animateTo(target.sunHeight, tween(1500)) }
-            launch { from.animateTo(toFrom, tween(1500)) }
-            night.animateTo(target.night, tween(1500))
+            launch { golden.animateTo(target.golden, tween(fadeMs)) }
+            launch { late.animateTo(target.late, tween(fadeMs)) }
+            launch { dawn.animateTo(target.dawn, tween(fadeMs)) }
+            launch { height.animateTo(target.sunHeight, tween(fadeMs)) }
+            launch { from.animateTo(toFrom, tween(fadeMs)) }
+            night.animateTo(target.night, tween(fadeMs))
         } else {
             golden.snapTo(target.golden); night.snapTo(target.night); late.snapTo(target.late)
             dawn.snapTo(target.dawn); height.snapTo(target.sunHeight); from.snapTo(toFrom)
@@ -82,17 +85,21 @@ fun rememberRoomLight(
         dawn.snapTo(last.dawn); height.snapTo(last.sunHeight); from.snapTo(last.sunFrom)
         previewLight.value = null
         val t = latest
-        launch { golden.animateTo(t.golden, tween(1500)) }
-        launch { late.animateTo(t.late, tween(1500)) }
-        launch { dawn.animateTo(t.dawn, tween(1500)) }
-        launch { height.animateTo(t.sunHeight, tween(1500)) }
-        launch { from.animateTo(from.value + turn(from.value, t.sunFrom), tween(1500)) }
-        night.animateTo(t.night, tween(1500))
+        launch { golden.animateTo(t.golden, tween(FADE_MS)) }
+        launch { late.animateTo(t.late, tween(FADE_MS)) }
+        launch { dawn.animateTo(t.dawn, tween(FADE_MS)) }
+        launch { height.animateTo(t.sunHeight, tween(FADE_MS)) }
+        launch { from.animateTo(from.value + turn(from.value, t.sunFrom), tween(FADE_MS)) }
+        night.animateTo(t.night, tween(FADE_MS))
     }
     return remember {
         { previewLight.value ?: RoomLight(golden.value, night.value, late.value, dawn.value, from.value, height.value) }
     }
 }
+
+/** A big change in the light (another mode, the end of a sped-up day) fades over this long. */
+private const val FADE_MS = 1500
+private const val FOLLOW_MS = 300
 
 /** The desk lamp hangs up-right of the record (where its glint is), and high. */
 private const val LAMP_FROM = -60f

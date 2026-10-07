@@ -122,6 +122,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
 import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
 import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
+import io.github.plvzfqrit.plvinyl.ui.lighting.TimeCard
 import io.github.plvzfqrit.plvinyl.ui.lighting.lightFrom
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
@@ -162,6 +163,8 @@ fun TurntableScreen(
     // Painting: the card at the top, and the screen showing the paint being chosen (a
     // draft) instead of the saved look. Done saves it; back throws it away.
     var painting by remember { mutableStateOf<PaintTarget?>(null) }
+    // Choosing a time of day for the sun: its card at the top, the room below as the preview.
+    var choosingTime by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf<Look?>(null) }
     val look = draft ?: saved
     // After Done, keep showing the paint until the saved look has caught up (saving takes
@@ -206,7 +209,8 @@ fun TurntableScreen(
     // Room lighting by the clock (or always day / night, from settings). While painting
     // it's daytime, so you see the true colors.
     val light = if (painting != null) RoomLight() else ui.roomLight
-    val roomLight = rememberRoomLight(light, preview = ui.dayPreview)
+    // While you set the time of day, the light keeps up with the slider.
+    val roomLight = rememberRoomLight(light, preview = ui.dayPreview, following = choosingTime)
     // What composition needs from the light (text and status bar colors), in coarse steps:
     // the drawing reads it at every frame, the screen doesn't rebuild for it.
     val nightNow by remember { derivedStateOf { (roomLight().night * 20f).roundToInt() / 20f } }
@@ -245,10 +249,10 @@ fun TurntableScreen(
     // it coasts to a stop and the app stops redrawing. Any touch or music wakes it.
     var coverClosed by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(settings.dustCover, ui.playing, lastTouch, ui.title, showSettings, painting) {
+    LaunchedEffect(settings.dustCover, ui.playing, lastTouch, ui.title, showSettings, painting, choosingTime) {
         animator.motorOn = true
         if (!settings.dustCover) coverClosed = false
-        if (ui.playing || showSettings || painting != null) {
+        if (ui.playing || showSettings || painting != null || choosingTime) {
             coverClosed = false
             return@LaunchedEffect
         }
@@ -284,7 +288,7 @@ fun TurntableScreen(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    if (painting != null) return@awaitEachGesture             // no stats while painting
+                    if (painting != null || choosingTime) return@awaitEachGesture // no stats meanwhile
                     val startP = statsProgress.value
                     val startedOpen = PageSwipe.startsOpen(startP)
                     var dx = 0f
@@ -619,6 +623,11 @@ fun TurntableScreen(
                         showSettings = false                                // so you can watch
                         vm.previewDay()
                     },
+                    onSetTime = {
+                        showSettings = false                                // so you can see the room
+                        vm.stopPreviewDay()
+                        choosingTime = true
+                    },
                     onDismiss = { showSettings = false },
                 )
             }
@@ -635,6 +644,23 @@ fun TurntableScreen(
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     .padding(top = 12.dp),
+            )
+        }
+
+        // ---- Choosing a time of day: the card on top, the room below as the preview.
+        if (choosingTime) {
+            // Nothing to throw away here (the time applies as you slide): a tap outside is Done.
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { choosingTime = false } })
+            BackHandler { choosingTime = false }
+            TimeCard(
+                held = settings.sunTime,
+                onHold = { t -> vm.updateSettings { it.copy(sunTime = t) } },
+                onDone = { choosingTime = false },
+                tick = { if (settings.haptics) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             )
         }
 
