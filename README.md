@@ -56,9 +56,9 @@ Two Gradle modules:
 ```
 
 ```
- player reports ──▶ ┌──────────────────────┐ ──▶ player commands
+ player reports ─▶ ┌──────────────────────┐ ──▶ player commands
  (PlayerSnapshot)   │  TurntableController │     (play, pause, seek, skip)
- your taps ───────▶ │                      │ ──▶ TurntableUiState (the screen)
+ your taps ──────▶ │                      │ ──▶ TurntableUiState (the screen)
  (UserIntent)       └──────────┬───────────┘
                                │ TurntableTarget
                                ▼
