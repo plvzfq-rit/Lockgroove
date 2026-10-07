@@ -116,6 +116,13 @@ installed outside the Play Store), open App info → ⋮ → *Allow restricted s
 
 YouTube (the video app) only shares what's playing with Premium; YouTube Music works.
 
+## Made with Claude
+
+I made PLVinyl with [Claude](https://claude.ai), Anthropic's AI assistant, as a pair
+programmer. On the first version it was my tutor while I learned Kotlin and Android. For
+this rewrite I wrote the plan, made the design calls and tested every build on my phone,
+and Claude wrote most of the code to match.
+
 ## Credits
 
 - Walnut and oak: CC0 veneer scans from [Poly Haven](https://polyhaven.com)
