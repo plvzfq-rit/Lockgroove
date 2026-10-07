@@ -253,9 +253,9 @@ fun TurntableScreen(
     }
 
     // ---------------- Dust cover ----------------
-    // Closes after a while with nothing playing and nobody touching; opens on a tap or
-    // as soon as music is wanted. The same idle timer switches the platter motor off:
-    // it coasts to a stop and the app stops redrawing. Any touch or music wakes it.
+    // With nothing playing and nobody touching, the platter motor switches off after half
+    // a minute (it coasts to a stop, and the app stops redrawing), and the dust cover
+    // closes after two. A tap opens the cover; any touch or music wakes the motor.
     var coverClosed by remember { mutableStateOf(false) }
     var lastTouch by remember { mutableLongStateOf(0L) }
     LaunchedEffect(settings.dustCover, ui.playing, lastTouch, ui.title, showSettings, painting, choosingTime) {
@@ -265,8 +265,9 @@ fun TurntableScreen(
             coverClosed = false
             return@LaunchedEffect
         }
-        delay(DUST_COVER_IDLE_MS)
+        delay(MOTOR_IDLE_MS)
         animator.motorOn = false
+        delay(DUST_COVER_IDLE_MS - MOTOR_IDLE_MS)
         if (settings.dustCover) coverClosed = true
     }
 
@@ -824,6 +825,9 @@ private fun PhoneSettingsEffects(settings: Settings, lightRoom: Boolean, audible
         window.attributes = window.attributes.apply { preferredDisplayModeId = modeId }
     }
 }
+
+/** The platter motor switches off after this long with nothing playing and no touches. */
+private const val MOTOR_IDLE_MS = 30 * 1000L
 
 /** The dust cover closes after this long with nothing playing and no touches. */
 private const val DUST_COVER_IDLE_MS = 2 * 60 * 1000L
