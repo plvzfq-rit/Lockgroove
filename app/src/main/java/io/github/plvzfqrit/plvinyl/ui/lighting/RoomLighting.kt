@@ -94,6 +94,7 @@ fun RoomShade(light: () -> RoomLight, modifier: Modifier) {
     Canvas(modifier) {
         val l = light()
         if (l.golden > 0f) drawRect(Color(0xFFFF9E40).copy(alpha = 0.14f * l.golden))
+        if (l.dawn > 0f) drawRect(Color(0xFFFFC2A0).copy(alpha = 0.10f * l.dawn))
         val dark = 0.55f * l.night + 0.25f * l.late
         if (dark > 0f) drawRect(Color(0xFF0A0704).copy(alpha = dark))
     }
@@ -124,13 +125,23 @@ fun LampLight(
  * light themselves (the front panel). [lampCenter] is in this scope's coordinates.
  */
 fun DrawScope.drawLampLight(l: RoomLight, lampCenter: Offset, recordRadius: Float, glint: Float = 1f) {
+    // Golden hour: warm on the sun's side, falling into a brown dusk on the far side.
+    // (At sunset the sun is on the left: exactly the old left-to-right gradient.)
     if (l.golden > 0f) {
-        drawRect(
-            Brush.horizontalGradient(
-                0f to Color(0xFFFFAA46).copy(alpha = 0.30f * l.golden),
-                0.45f to Color(0xFFFF963C).copy(alpha = 0.12f * l.golden),
-                1f to Color(0xFF5A280A).copy(alpha = 0.28f * l.golden),
-            )
+        drawSideLight(
+            l.sunFrom,
+            0f to Color(0xFFFFAA46).copy(alpha = 0.30f * l.golden),
+            0.45f to Color(0xFFFF963C).copy(alpha = 0.12f * l.golden),
+            1f to Color(0xFF5A280A).copy(alpha = 0.28f * l.golden),
+        )
+    }
+    // Dawn: the same, softer and cooler: peach on the sun's side, a little blue dusk opposite.
+    if (l.dawn > 0f) {
+        drawSideLight(
+            l.sunFrom,
+            0f to Color(0xFFFFC9A0).copy(alpha = 0.20f * l.dawn),
+            0.45f to Color(0xFFFFB98A).copy(alpha = 0.08f * l.dawn),
+            1f to Color(0xFF2A3346).copy(alpha = 0.16f * l.dawn),
         )
     }
     if (l.night > 0f) {
@@ -157,6 +168,20 @@ fun DrawScope.drawLampLight(l: RoomLight, lampCenter: Offset, recordRadius: Floa
             )
         }
     }
+}
+
+/**
+ * A gradient across the whole area, starting on the side the light comes [from] (degrees,
+ * screen: 0 = right, -90 = top, ±180 = left) and ending on the opposite side.
+ */
+private fun DrawScope.drawSideLight(from: Float, vararg stops: Pair<Float, Color>) {
+    val a = Math.toRadians(from.toDouble())
+    val dx = cos(a).toFloat()
+    val dy = sin(a).toFloat()
+    // How far the area reaches along that direction from its center.
+    val reach = (abs(dx) * size.width + abs(dy) * size.height) / 2f
+    val toLight = Offset(dx * reach, dy * reach)
+    drawRect(Brush.linearGradient(*stops, start = center + toLight, end = center - toLight))
 }
 
 /** Title color: the background's text color by day, warm cream under the lamp. */
