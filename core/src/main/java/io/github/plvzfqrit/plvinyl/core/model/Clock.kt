@@ -14,6 +14,12 @@ interface Clock {
     /** Wall-clock milliseconds (System.currentTimeMillis): for dates in the play log. */
     fun wallMs(): Long
 
+    /** The phone's time zone, as an IANA id like "Asia/Manila" (where the sun is, roughly). */
+    fun zoneId(): String = TimeZone.getDefault().id
+
+    /** That time zone's offset from UTC right now, in ms. */
+    fun utcOffsetMs(): Int = TimeZone.getDefault().getOffset(wallMs())
+
     /** Minutes since local midnight, with fractions (room lighting). */
     fun minuteOfDay(): Float {
         val c = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = wallMs() }

@@ -210,7 +210,7 @@ fun SettingsSheet(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = when (settings.lighting) {
-                        LightingMode.Clock -> "Follows your phone's clock: daylight, golden hour from 5 pm, a desk lamp from 7 pm, dimmer after 1 am."
+                        LightingMode.Clock -> "Follows the sun where your phone's time zone says you are (no location used): a soft glow at sunrise, golden hour before sunset, a desk lamp after dark."
                         LightingMode.Day -> "Always soft daylight."
                         LightingMode.Golden -> "Always golden hour: warm, low sun from the left."
                         LightingMode.Night -> "Always the desk lamp in a dark room."

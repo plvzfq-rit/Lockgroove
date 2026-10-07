@@ -7,4 +7,10 @@ import io.github.plvzfqrit.plvinyl.core.model.Clock
 object AndroidClock : Clock {
     override fun nowMs(): Long = SystemClock.elapsedRealtime()
     override fun wallMs(): Long = System.currentTimeMillis()
+
+    /** The phone's time zone, with old names (like "Asia/Calcutta") mapped to today's. */
+    override fun zoneId(): String {
+        val id = java.util.TimeZone.getDefault().id
+        return android.icu.util.TimeZone.getCanonicalID(id) ?: id
+    }
 }

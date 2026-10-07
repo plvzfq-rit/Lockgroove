@@ -4,6 +4,7 @@ import io.github.plvzfqrit.plvinyl.core.history.PlayCounter
 import io.github.plvzfqrit.plvinyl.core.history.PlayedSong
 import io.github.plvzfqrit.plvinyl.core.lighting.LightingMode
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
+import io.github.plvzfqrit.plvinyl.core.lighting.ZonePlaces
 import io.github.plvzfqrit.plvinyl.core.lighting.lightAt
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.Clock
@@ -218,7 +219,9 @@ class TurntableController(
         if (mode != lightMode || now - lightCheckedAt >= LIGHT_CHECK_MS) {
             lightMode = mode
             lightCheckedAt = now
-            roomLight = mode.lightAt(clock.minuteOfDay())
+            // Where the sun is comes from the phone's time zone (re-read: you may have travelled).
+            val place = ZonePlaces.forZone(clock.zoneId(), clock.utcOffsetMs())
+            roomLight = mode.lightAt(clock.wallMs(), clock.minuteOfDay(), place)
         }
         when (val p = phase) {
             Phase.Stopped -> return
