@@ -5,22 +5,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class MotionPolicyTest {
-    private fun pace(motion: MotionQuality, spin: Float = 30f, phone: PhoneState = PhoneState()) =
-        MotionPolicy.pace(motion, spin, phone)
+    private fun pace(motion: MotionQuality, phone: PhoneState = PhoneState()) = MotionPolicy.pace(motion, phone)
 
-    @Test fun `Balanced turns slow records at 30 frames a second and 33⅓ at 60`() {
-        assertEquals(30, pace(MotionQuality.Balanced, 30f).framesPerSecond)        // Slow
-        assertEquals(30, pace(MotionQuality.Balanced, 60f).framesPerSecond)        // Medium
-        assertEquals(60, pace(MotionQuality.Balanced, 200f).framesPerSecond)       // 33⅓ RPM
-    }
-
-    @Test fun `Battery is 20 frames a second whatever the speed`() {
-        assertEquals(20, pace(MotionQuality.Battery, 30f).framesPerSecond)
-        assertEquals(20, pace(MotionQuality.Battery, 200f).framesPerSecond)
-    }
-
-    @Test fun `Smooth uses every frame the screen shows`() {
+    @Test fun `Balanced and Smooth turn the record at every frame the screen shows`() {
+        assertEquals(MotionPolicy.EVERY_FRAME, pace(MotionQuality.Balanced).framesPerSecond)
         assertEquals(MotionPolicy.EVERY_FRAME, pace(MotionQuality.Smooth).framesPerSecond)
+    }
+
+    @Test fun `Battery is 20 frames a second`() {
+        assertEquals(20, pace(MotionQuality.Battery).framesPerSecond)
     }
 
     @Test fun `a long title goes round for good, or a few times when motion is light`() {

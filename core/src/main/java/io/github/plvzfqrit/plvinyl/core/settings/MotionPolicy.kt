@@ -23,17 +23,13 @@ data class Pace(val framesPerSecond: Int, val titlePasses: Int, val slowDown: Sl
 
 /**
  * How often the moving parts of the turntable (the record, a long title) are redrawn:
- * most of the app's battery use, and most of the phone's warmth. A slowly turning
- * record looks the same at 30 frames a second as at 60, so it gets 30; a record at
- * 33⅓ RPM needs 60 to stay smooth. A warm phone, Battery Saver, or a dimmed screen
- * gets lighter motion; a hot phone, the lightest.
+ * most of the app's battery use, and most of the phone's warmth. The record turns at
+ * the screen's own rate (it looks steppy any slower); a warm phone, Battery Saver, or
+ * a dimmed screen gets lighter motion, and a hot phone the lightest.
  */
 object MotionPolicy {
     /** Every frame the screen shows, at its own rate. */
     const val EVERY_FRAME = 0
-
-    /** Spins up to this fast (degrees a second: Slow and Medium) look smooth at 30 fps. */
-    const val SLOW_SPIN = 60f
 
     /** Light motion: at this rate or below, scrolling text steps visibly, so it only goes round a few times. */
     private const val LIGHT_FPS = 20
@@ -41,10 +37,9 @@ object MotionPolicy {
     /** A hot phone: the record turns in slow steps and the title rests. */
     private const val HOT_FPS = 10
 
-    fun pace(motion: MotionQuality, spinDegPerSec: Float, phone: PhoneState = PhoneState()): Pace {
+    fun pace(motion: MotionQuality, phone: PhoneState = PhoneState()): Pace {
         val chosen = when (motion) {
-            MotionQuality.Smooth -> EVERY_FRAME
-            MotionQuality.Balanced -> if (spinDegPerSec <= SLOW_SPIN) 30 else 60
+            MotionQuality.Smooth, MotionQuality.Balanced -> EVERY_FRAME   // Balanced holds the screen at 60 Hz
             MotionQuality.Battery -> LIGHT_FPS
         }
         val (fps, why) = when {

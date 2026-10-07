@@ -37,7 +37,7 @@ object Scales {
  */
 enum class MotionQuality(val label: String) {
     Battery("Battery"),             // 20 frames a second (lightest)
-    Balanced("Balanced"),           // 30 for slow spins, 60 at 33⅓, screen held at 60 Hz
+    Balanced("Balanced"),           // every frame, screen held at 60 Hz
     Smooth("Smooth"),               // every frame at the screen's full rate (90/120 Hz)
 }
 

@@ -68,8 +68,8 @@ Two Gradle modules:
 Redrawing the screen is what uses the battery (and warms the phone), so the app only
 redraws what has visibly changed:
 
-- Everything that moves keeps one beat: the record redraws 30 times a second at slow
-  speeds (60 at 33⅓), and a scrolling title moves on the same frames.
+- Everything that moves keeps one beat: a scrolling title moves on the same frames as
+  the record, and in Battery mode both step evenly, 20 times a second.
 - The tonearm is redrawn only when it has moved a visible amount: while a song plays,
   the needle creeps well under a pixel a second.
 - When the phone says it's warm, or Battery Saver is on, motion gets lighter; when it's

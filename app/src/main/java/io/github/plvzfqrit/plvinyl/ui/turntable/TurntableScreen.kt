@@ -229,7 +229,7 @@ fun TurntableScreen(
     // Dimmed: a record has played a while with nobody touching the phone (see below).
     var dimmed by remember { mutableStateOf(false) }
     val phone = rememberPhoneState(dimmed = dimmed)
-    val pace = MotionPolicy.pace(settings.motion, settings.spin, phone)
+    val pace = MotionPolicy.pace(settings.motion, phone)
     val beat = rememberBeat(pace.framesPerSecond)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
