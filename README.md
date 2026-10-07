@@ -63,7 +63,7 @@ Two Gradle modules:
                                │ TurntableTarget
                                ▼
                          MovePlanner ──▶ one physical move ──▶ TurntableAnimator
-                               ▲                                   │
+                               ▲                                    │
                                └───────── move finished ◀──────────┘
 ```
 
