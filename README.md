@@ -6,6 +6,16 @@ anywhere on the record and it plays from there.
 
 No ads, no account, no internet permission. Everything stays on your phone.
 
+<p align="center">
+  <img src="docs/screenshots/golden-walnut.jpg" width="32%" alt="A record playing on the walnut deck at golden hour">
+  <img src="docs/screenshots/night.jpg" width="32%" alt="At night: the desk lamp's pool on the record, the tonearm catching its light, backlit keys">
+  <img src="docs/screenshots/day-oak.jpg" width="32%" alt="Daylight on the oak deck">
+</p>
+<p align="center">
+  <img src="docs/screenshots/settings.jpg" width="32%" alt="Settings: backgrounds, including walnut and oak, and vinyl finishes">
+  <img src="docs/screenshots/settings-sliders.jpg" width="32%" alt="Settings: spin speed and needle lift sliders, and the lighting choices">
+</p>
+
 ## What it does
 
 - **A semi-automatic turntable.** The arm never slides across the record: it lifts,
