@@ -194,6 +194,9 @@ private val ArmSilhouette: Path by lazy {
     }
 }
 
+/** The arm's shadow in the app's usual daylight (light from the top-left): down and to the right. */
+val DaylightShadow = Offset(0.574f, 0.819f)
+
 /** How much bigger the arm looks at full lift (it's closer to the viewer). */
 private const val LIFT_SCALE = 0.035f
 
@@ -208,15 +211,17 @@ fun DrawScope.drawTonearmArm(
     armAngleDeg: Float,
     lift: Float = 0f,
     colors: TonearmColors = TonearmColors(),
+    /** Which way the shadow falls, and how long (1 = usual daylight): see RoomLight.shadow(). */
+    shadow: Offset = DaylightShadow,
 ) {
     val l = lift.coerceIn(0f, 1f)
     val grow = 1f + LIFT_SCALE * l
     withTransform({ translate(pivot.x, pivot.y); scale(pxPerUnit, pxPerUnit, pivot = Offset.Zero) }) {
-        // Shadow: the arm's silhouette (one pre-built path, one draw call), offset
-        // down-right (light from top-left). Cheap enough to redraw every frame.
-        val drop = 2f + 10f * l
+        // Shadow: the arm's silhouette (one pre-built path, one draw call), cast away
+        // from the light. Cheap enough to redraw every frame.
+        val drop = (2f + 10f * l) * 1.64f
         withTransform({
-            translate(drop, drop * 1.3f)
+            translate(shadow.x * drop, shadow.y * drop)
             rotate(armAngleDeg, pivot = Offset.Zero)
             scale(grow, grow, pivot = Offset.Zero)
         }) { drawPath(ArmSilhouette, Color.Black.copy(alpha = 0.32f - 0.14f * l)) }
@@ -257,9 +262,10 @@ fun DrawScope.drawTonearmArmForPlatter(
     armAngleDeg: Float,
     lift: Float = 0f,
     colors: TonearmColors = TonearmColors(),
+    shadow: Offset = DaylightShadow,
 ) {
     val (pivot, pxPerUnit) = tonearmPlacementFor(spindle, platterRadiusPx)
-    drawTonearmArm(pivot, pxPerUnit, armAngleDeg, lift, colors)
+    drawTonearmArm(pivot, pxPerUnit, armAngleDeg, lift, colors, shadow)
 }
 
 /** Standalone tonearm that fits itself into its own box (icons, previews). */

@@ -96,6 +96,11 @@ fun VinylRecord(
     seedKey: String,
     rotation: () -> Float,              // read only inside graphicsLayer → no redraws while spinning
     modifier: Modifier = Modifier,
+    /**
+     * How far to turn the reflection (degrees) from its usual top-left light, so it faces
+     * wherever the light comes from. Read only inside graphicsLayer.
+     */
+    sheenAngle: () -> Float = { 0f },
     /** Faint glints on the grooves that make the spin easier to see. */
     grooveGlints: Boolean = true,
     /** 12" LP or 7" single. */
@@ -160,8 +165,8 @@ fun VinylRecord(
         ) {
             drawImage(disc, filterQuality = FilterQuality.Low)   // bilinear: smooth while rotating
         }
-        // Fixed reflection on top.
-        Canvas(Modifier.fillMaxSize()) {
+        // The reflection on top: it doesn't spin with the record, it faces the light.
+        Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = sheenAngle() }) {
             drawImage(sheen)
         }
     }

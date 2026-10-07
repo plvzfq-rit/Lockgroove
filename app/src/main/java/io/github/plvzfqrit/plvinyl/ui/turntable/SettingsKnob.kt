@@ -33,7 +33,12 @@ import androidx.compose.ui.unit.dp
  * Round black button (the real deck's pairing button). Here it opens the settings.
  */
 @Composable
-fun SettingsKnob(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsKnob(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Which way its shadow falls (see RoomLight.shadow()). */
+    shadow: () -> Offset = { Offset(0f, 1f) },
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val view = LocalView.current
@@ -48,7 +53,7 @@ fun SettingsKnob(onClick: () -> Unit, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawCircle(Color.Black.copy(alpha = 0.3f), radius = size.minDimension / 2 * s, center = center + Offset(0f, 2.dp.toPx()))
+            drawCircle(Color.Black.copy(alpha = 0.3f), radius = size.minDimension / 2 * s, center = center + shadow() * 2.dp.toPx())
             drawCircle(
                 Brush.radialGradient(
                     listOf(Color(0xFF3A3A3A), Color(0xFF050505)),

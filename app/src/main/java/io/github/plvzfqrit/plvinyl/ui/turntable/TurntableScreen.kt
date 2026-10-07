@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,6 +59,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
@@ -109,7 +109,9 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.platterFelt
 import io.github.plvzfqrit.plvinyl.ui.drawing.tonearmPlacementFor
 import io.github.plvzfqrit.plvinyl.ui.lighting.LampLight
 import io.github.plvzfqrit.plvinyl.ui.lighting.RoomShade
+import io.github.plvzfqrit.plvinyl.ui.lighting.lightFrom
 import io.github.plvzfqrit.plvinyl.ui.lighting.litTextColor
+import io.github.plvzfqrit.plvinyl.ui.lighting.shadow
 import io.github.plvzfqrit.plvinyl.ui.lighting.rememberRoomLight
 import io.github.plvzfqrit.plvinyl.ui.paint.PaintCard
 import io.github.plvzfqrit.plvinyl.ui.paint.PaintTarget
@@ -334,13 +336,32 @@ fun TurntableScreen(
                 )
             }
 
+            // The platter's shadow on the deck: cast away from the light, longer as the sun
+            // gets low, short under the night lamp. (Android's own elevation shadows have
+            // their light fixed at the top of the screen, so this one is drawn.)
+            Canvas(Modifier.fillMaxSize()) {
+                val s = roomLight().shadow()
+                val r = platterRadius.toPx()
+                val c = Offset(spindleX.toPx(), spindleY.toPx())
+                fun softDisc(at: Offset, alpha: Float, spread: Float) = drawCircle(
+                    Brush.radialGradient(
+                        0f to Color.Black.copy(alpha = alpha),
+                        (r - spread * 0.25f) / (r + spread) to Color.Black.copy(alpha = alpha),
+                        1f to Color.Transparent,
+                        center = at, radius = r + spread,
+                    ),
+                    r + spread, at,
+                )
+                softDisc(c, alpha = 0.10f, spread = 10.dp.toPx())                     // ambient, all round
+                softDisc(c + s * 9.dp.toPx(), alpha = 0.24f, spread = 22.dp.toPx())   // cast by the light
+            }
+
             // Platter + record.
             Box(
                 Modifier
                     .offset(x = platterLeft, y = platterTop)
                     .wrapContentSize(align = Alignment.TopStart, unbounded = true)
-                    .requiredSize(platterSize)
-                    .shadow(elevation = 16.dp, shape = CircleShape, clip = false),
+                    .requiredSize(platterSize),
             ) {
                 Spacer(Modifier.fillMaxSize().platterFelt())
                 if (disc != null) {
@@ -351,6 +372,7 @@ fun TurntableScreen(
                         wear = if (settings.recordWear) Wear.of(counts[disc.key] ?: 0) else 0f,
                         seedKey = disc.key.value,
                         rotation = { animator.spinAngle },
+                        sheenAngle = { roomLight().lightFrom() - RoomLight.DAY_FROM },
                         size = disc.size,
                         title = disc.title,
                         artist = disc.artist,
@@ -468,6 +490,7 @@ fun TurntableScreen(
                     armAngleDeg = animator.armAngle.value,
                     lift = animator.armLift.value,
                     colors = armColors,
+                    shadow = roomLight().shadow(),
                 )
             }
 
@@ -477,6 +500,7 @@ fun TurntableScreen(
             val settingsCenterX = minOf(pivotX + unit * 40f, screenWidth - 12.dp - 27.dp)
             SettingsKnob(
                 onClick = { showSettings = true },
+                shadow = { roomLight().shadow() },
                 // 54 dp square (42 dp knob + 6 dp margin): its bottom sits on the platter's baseline.
                 modifier = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp),
             )

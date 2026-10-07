@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 /*
  * Drawing the room's light (what the light IS comes from the core's roomLightAt):
@@ -34,18 +36,56 @@ fun rememberRoomLight(target: RoomLight): () -> RoomLight {
     val golden = remember { Animatable(target.golden) }
     val night = remember { Animatable(target.night) }
     val late = remember { Animatable(target.late) }
+    val dawn = remember { Animatable(target.dawn) }
+    val height = remember { Animatable(target.sunHeight) }
+    // The light's direction is kept unwrapped, so it always turns the short way round.
+    val from = remember { Animatable(target.sunFrom) }
     LaunchedEffect(target) {
+        val toFrom = from.value + turn(from.value, target.sunFrom)
         val fade = abs(target.night - night.value) > 0.05f ||
-                abs(target.golden - golden.value) > 0.05f || abs(target.late - late.value) > 0.05f
+                abs(target.golden - golden.value) > 0.05f || abs(target.late - late.value) > 0.05f ||
+                abs(target.dawn - dawn.value) > 0.05f || abs(target.sunHeight - height.value) > 0.1f ||
+                abs(toFrom - from.value) > 10f
         if (fade) {
             launch { golden.animateTo(target.golden, tween(1500)) }
             launch { late.animateTo(target.late, tween(1500)) }
+            launch { dawn.animateTo(target.dawn, tween(1500)) }
+            launch { height.animateTo(target.sunHeight, tween(1500)) }
+            launch { from.animateTo(toFrom, tween(1500)) }
             night.animateTo(target.night, tween(1500))
         } else {
             golden.snapTo(target.golden); night.snapTo(target.night); late.snapTo(target.late)
+            dawn.snapTo(target.dawn); height.snapTo(target.sunHeight); from.snapTo(toFrom)
         }
     }
-    return remember { { RoomLight(golden.value, night.value, late.value) } }
+    return remember { { RoomLight(golden.value, night.value, late.value, dawn.value, from.value, height.value) } }
+}
+
+/** The desk lamp hangs up-right of the record (where its glint is), and high. */
+private const val LAMP_FROM = -60f
+private const val LAMP_SHADOW = 0.5f
+
+/** The shortest turn from [a] to [b], degrees (-180..180). */
+private fun turn(a: Float, b: Float): Float {
+    var d = (b - a) % 360f
+    if (d > 180f) d -= 360f
+    if (d < -180f) d += 360f
+    return d
+}
+
+/** Where the light on the deck comes from (degrees, screen): the sun by day, the lamp at night. */
+fun RoomLight.lightFrom(): Float = sunFrom + turn(sunFrom, LAMP_FROM) * night
+
+/**
+ * Which way shadows fall and how long they are, as one vector: away from the light, and
+ * 1 = the app's usual daylight shadow. Short at noon, long as the sun gets low, short
+ * again under the night lamp.
+ */
+fun RoomLight.shadow(): Offset {
+    val a = Math.toRadians(lightFrom().toDouble())
+    val day = 0.4f + 1.5f * (1f - sunHeight)
+    val length = day + (LAMP_SHADOW - day) * night
+    return Offset((-cos(a) * length).toFloat(), (-sin(a) * length).toFloat())
 }
 
 /** Darkens / warms the background (the room). Draw it right above the backdrop. */
