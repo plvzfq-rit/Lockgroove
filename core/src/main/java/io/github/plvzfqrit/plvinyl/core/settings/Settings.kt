@@ -32,13 +32,13 @@ object Scales {
 }
 
 /**
- * How often the spinning record is redrawn. Most of the app's battery use is
- * redrawing the screen. Battery and Balanced also ask the screen for 60 Hz.
+ * How often the spinning record is redrawn (see [MotionPolicy]). Most of the app's
+ * battery use is redrawing the screen. Battery and Balanced also ask the screen for 60 Hz.
  */
-enum class MotionQuality(val label: String, val fps: Int) {
-    Battery("Battery", 20),         // steps (lightest)
-    Balanced("Balanced", 0),        // every frame, screen held at 60 Hz
-    Smooth("Smooth", 0),            // every frame at the screen's full rate (90/120 Hz)
+enum class MotionQuality(val label: String) {
+    Battery("Battery"),             // 20 frames a second (lightest)
+    Balanced("Balanced"),           // 30 for slow spins, 60 at 33⅓, screen held at 60 Hz
+    Smooth("Smooth"),               // every frame at the screen's full rate (90/120 Hz)
 }
 
 /** Everything adjustable, plus what the app has learned. Plain data: saved by the app. */

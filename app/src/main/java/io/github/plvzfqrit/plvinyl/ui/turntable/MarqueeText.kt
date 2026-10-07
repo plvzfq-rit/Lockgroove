@@ -1,16 +1,13 @@
 package io.github.plvzfqrit.plvinyl.ui.turntable
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.MotionDurationScale
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -28,10 +25,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import io.github.plvzfqrit.plvinyl.ui.common.Beat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 /** How fast a long title scrolls. */
 private val Velocity = 30.dp
@@ -42,16 +38,11 @@ private const val GAP = 1f / 3f
 /** The pause at the start of each pass, so the beginning can be read. */
 private const val PAUSE_MS = 1500L
 
-/** The marquee keeps its own pace, whatever the phone's animation speed is set to. */
-private object OwnPace : MotionDurationScale {
-    override val scaleFactor = 1f
-}
-
 /**
  * Single-line text. If it fits, it just sits there. If it's too long, it scrolls like
  * a marquee, with soft fades at the edges: round and round while [scrolling], pausing at
  * the start of each pass. When [scrolling] stops, it finishes its pass and rests at the
- * start (so a resting screen isn't redrawn).
+ * start (so a resting screen isn't redrawn). It moves on [beat], in step with the record.
  *
  * @param onScreen false while something covers it: it stops at once, back at the start
  * @param passes at most this many passes for this text; then it rests anyway
@@ -62,6 +53,7 @@ fun MarqueeText(
     color: Color,
     style: TextStyle,
     scrolling: Boolean,
+    beat: Beat,
     modifier: Modifier = Modifier,
     onScreen: Boolean = true,
     passes: Int = Int.MAX_VALUE,
@@ -79,23 +71,30 @@ fun MarqueeText(
         // One pass moves the text along by its length plus the gap. By then the copy
         // drawn behind it has arrived where the text started, so the loop is seamless.
         val travel = textWidth + constraints.maxWidth * GAP
-        val offset = remember(text) { Animatable(0f) }
+        val offset = remember(text) { mutableFloatStateOf(0f) }
         val keepGoing by rememberUpdatedState(scrolling)
+        val latestBeat by rememberUpdatedState(beat)
         val pxPerSecond = with(LocalDensity.current) { Velocity.toPx() }
         LaunchedEffect(text, travel, passes, onScreen) {
-            offset.snapTo(0f)
+            offset.floatValue = 0f
             if (!onScreen) return@LaunchedEffect
-            withContext(OwnPace) {
-                var done = 0
-                while (done < passes) {
-                    snapshotFlow { keepGoing }.first { it }      // rest until it may move
-                    delay(PAUSE_MS)
-                    if (!keepGoing) continue
-                    // Linear, and finished even if [scrolling] stops on the way.
-                    offset.animateTo(travel, tween((travel / pxPerSecond * 1000).roundToInt(), easing = LinearEasing))
-                    offset.snapTo(0f)
-                    done++
-                }
+            var done = 0
+            while (done < passes) {
+                snapshotFlow { keepGoing }.first { it }          // rest until it may move
+                delay(PAUSE_MS)
+                if (!keepGoing) continue
+                // One pass at a steady speed, moved inside the beat's frames (so it repaints
+                // with the record). Finished even if [scrolling] stops on the way; at the
+                // end, back to 0 looks the same (the copy has arrived).
+                val start = latestBeat.withFrame { it }
+                do {
+                    val arrived = latestBeat.withFrame { now ->
+                        val x = (now - start) / 1_000_000_000f * pxPerSecond
+                        offset.floatValue = if (x >= travel) 0f else x
+                        x >= travel
+                    }
+                } while (!arrived)
+                done++
             }
         }
 
@@ -126,7 +125,7 @@ fun MarqueeText(
                 // The text, and its copy coming round behind it. Read in the draw phase:
                 // scrolling only redraws.
                 .drawWithContent {
-                    val x = offset.value
+                    val x = offset.floatValue
                     translate(left = -x) { this@drawWithContent.drawContent() }
                     translate(left = travel - x) { this@drawWithContent.drawContent() }
                 }

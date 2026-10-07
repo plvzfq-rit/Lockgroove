@@ -321,8 +321,8 @@ fun SettingsSheet(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = when (settings.motion) {
-                        MotionQuality.Battery -> "The record turns in small steps. Lightest on the battery."
-                        MotionQuality.Balanced -> "Smooth turning at 60 Hz. Recommended."
+                        MotionQuality.Battery -> "The record turns in small steps (20 a second). Lightest on the battery."
+                        MotionQuality.Balanced -> "Smooth turning: 30 frames a second at slow speeds, 60 at 33⅓. Recommended."
                         MotionQuality.Smooth -> "Your screen's full rate (90/120 Hz). Uses noticeably more battery."
                     },
                     fontSize = 12.sp,

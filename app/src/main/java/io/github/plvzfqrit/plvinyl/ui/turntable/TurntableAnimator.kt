@@ -21,6 +21,7 @@ import io.github.plvzfqrit.plvinyl.core.turntable.Deck
 import io.github.plvzfqrit.plvinyl.core.turntable.Move
 import io.github.plvzfqrit.plvinyl.core.turntable.MovePlanner
 import io.github.plvzfqrit.plvinyl.core.turntable.TurntableTarget
+import io.github.plvzfqrit.plvinyl.ui.common.Beat
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -77,8 +78,8 @@ class TurntableAnimator {
     var spinAngle by mutableFloatStateOf(0f)
         private set
 
-    /** Redraw the spinning record at most this often (ms). 0 = every screen refresh. */
-    var frameIntervalMs by mutableStateOf(0L)
+    /** When the spinning record is redrawn: the beat everything moving keeps. */
+    var beat by mutableStateOf(Beat.EveryFrame)
 
     /** Platter motor. Off = spins down and stops, and then nothing is redrawn. */
     var motorOn by mutableStateOf(true)
@@ -109,9 +110,7 @@ class TurntableAnimator {
                 snapshotFlow { visible && disc != null && (motorOn || motor.value > 0f) }.first { it }
                 last = 0L
             }
-            val interval = frameIntervalMs
-            if (interval > 0L) delay(interval)
-            withFrameNanos { now ->
+            beat.withFrame { now ->
                 if (last != 0L) {
                     // Clamp: after a hiccup (or coming back) keep going smoothly instead of jumping.
                     val dt = ((now - last) / 1_000_000_000f).coerceAtMost(0.1f)

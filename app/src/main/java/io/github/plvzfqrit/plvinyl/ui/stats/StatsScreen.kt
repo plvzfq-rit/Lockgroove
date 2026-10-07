@@ -70,6 +70,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.DeckColors
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
+import io.github.plvzfqrit.plvinyl.ui.common.Beat
 import io.github.plvzfqrit.plvinyl.ui.drawing.rememberPacedSpin
 import java.util.Calendar
 import kotlinx.coroutines.Dispatchers
@@ -199,6 +200,8 @@ fun StatsScreen(
     history: PlayLogStore,
     colors: StatsColors,
     reveal: () -> Float,
+    /** The turntable's beat: the record of the period turns on it. */
+    beat: Beat,
     modifier: Modifier = Modifier,
 ) {
     var period by rememberSaveable { mutableStateOf(StatsPeriod.Year) }
@@ -293,7 +296,7 @@ fun StatsScreen(
                     stats.top.firstOrNull()?.let { r ->
                         Column(Modifier.reveal(REVEAL_STEPS, reveal)) {
                             Spacer(Modifier.height(20.dp))
-                            RecordOfThePeriod(r, period, history)
+                            RecordOfThePeriod(r, period, history, beat)
                         }
                     }
                 }
@@ -507,9 +510,9 @@ private fun PlayerSplit(players: List<Pair<String, Int>>, total: Int) {
 }
 
 @Composable
-private fun RecordOfThePeriod(r: TopRecord, period: StatsPeriod, history: PlayLogStore) {
+private fun RecordOfThePeriod(r: TopRecord, period: StatsPeriod, history: PlayLogStore, beat: Beat) {
     val art = rememberSleeve(history, r.key)
-    val angle = rememberPacedSpin()
+    val angle = rememberPacedSpin(beat)
     val title = when (period) {
         StatsPeriod.Month -> "Your record of the month"
         StatsPeriod.Year -> "Your record of the year"

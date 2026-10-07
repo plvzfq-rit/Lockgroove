@@ -103,6 +103,7 @@ import io.github.plvzfqrit.plvinyl.core.lighting.DayPreview
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
+import io.github.plvzfqrit.plvinyl.core.settings.MotionPolicy
 import io.github.plvzfqrit.plvinyl.core.settings.MotionQuality
 import io.github.plvzfqrit.plvinyl.core.settings.Settings
 import io.github.plvzfqrit.plvinyl.core.turntable.Move
@@ -112,6 +113,7 @@ import io.github.plvzfqrit.plvinyl.ui.drawing.BackdropStyle
 import io.github.plvzfqrit.plvinyl.ui.drawing.Look
 import io.github.plvzfqrit.plvinyl.ui.drawing.RECORD_TO_PLATTER
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableBackdrop
+import io.github.plvzfqrit.plvinyl.ui.common.rememberBeat
 import io.github.plvzfqrit.plvinyl.ui.drawing.TonearmGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.TurntableGeometry
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
@@ -216,11 +218,14 @@ fun TurntableScreen(
     // the drawing reads it at every frame, the screen doesn't rebuild for it.
     val nightNow by remember { derivedStateOf { (roomLight().night * 20f).roundToInt() / 20f } }
     PhoneSettingsEffects(settings, lightRoom = deck.isLight && nightNow < 0.5f, audible = ui.audible)
+    // How often what moves is redrawn (the record, a long title): the biggest battery
+    // cost. Everything moving keeps the same beat, so it all repaints together.
+    val framesPerSecond = MotionPolicy.framesPerSecond(settings.motion, settings.spin)
+    val beat = rememberBeat(framesPerSecond)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
         animator.spinDegPerSec = settings.spin * (disc?.size?.spinFactor ?: 1f)
-        // How often the record is redrawn (the biggest battery cost).
-        animator.frameIntervalMs = settings.motion.fps.let { if (it == 0) 0L else 1000L / it }
+        animator.beat = beat
     }
 
     val counts by vm.history.counts.collectAsStateWithLifecycle()
@@ -567,19 +572,19 @@ fun TurntableScreen(
             ) {
                 // Title/artist fade to the new song. Long ones scroll (marquee) while the
                 // record plays (the screen is redrawing for the spin then anyway), and rest
-                // when it stops or the stats cover it. Battery: a few passes per song.
-                val passes = if (settings.motion == MotionQuality.Battery) 3 else Int.MAX_VALUE
+                // when it stops or the stats cover it. Light motion: a few passes per song.
+                val passes = MotionPolicy.titlePasses(framesPerSecond)
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
                         val text = litTextColor(deck.contentColor, RoomLight(night = nightNow))
                         MarqueeText(
                             t, text, MaterialTheme.typography.headlineMedium,
-                            scrolling = ui.playing, onScreen = animator.visible, passes = passes,
+                            scrolling = ui.playing, beat = beat, onScreen = animator.visible, passes = passes,
                         )
                         if (a != null) {
                             MarqueeText(
                                 a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium,
-                                scrolling = ui.playing, onScreen = animator.visible, passes = passes,
+                                scrolling = ui.playing, beat = beat, onScreen = animator.visible, passes = passes,
                             )
                         }
                     }
@@ -731,6 +736,7 @@ fun TurntableScreen(
                 history = vm.history,
                 colors = if (nightNow > 0.5f) NightStatsColors else deck.statsColors(),
                 reveal = { PageSwipe.reveal(statsProgress.value) },
+                beat = beat,
             )
         }
     }

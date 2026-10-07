@@ -43,6 +43,7 @@ import io.github.plvzfqrit.plvinyl.media.MediaListenerService
 import io.github.plvzfqrit.plvinyl.media.MediaSessionWatcher
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylFinish
 import io.github.plvzfqrit.plvinyl.ui.drawing.VinylRecord
+import io.github.plvzfqrit.plvinyl.ui.common.rememberBeat
 import io.github.plvzfqrit.plvinyl.ui.drawing.rememberPacedSpin
 
 /** Has the user let PLVinyl see what's playing (notification access)? */
@@ -74,7 +75,7 @@ private fun WelcomeScreen() {
     val fg = Color(0xFFEDE7DC)
 
     // A slowly turning record with a plain label: the first thing you see.
-    val angle = rememberPacedSpin()
+    val angle = rememberPacedSpin(rememberBeat(framesPerSecond = 30))
 
     Box(
         Modifier
