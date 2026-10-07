@@ -112,3 +112,12 @@ YouTube (the video app) only shares what's playing with Premium; YouTube Music w
   (*Black Walnut Veneer 02* and *Red Oak Veneer*), cropped and given an oiled finish by
   [`tools/make_wood.py`](tools/make_wood.py).
 - Where the sun is: the reference cities in the tz database's `zone.tab` (public domain).
+
+## License
+
+Copyright © 2026 James Christian Ruiz.
+
+PLVinyl is free software under the [GNU General Public License v3.0](LICENSE): you can
+use it, change it and share it, and if you share a changed version, its source has to be
+shared under the same license. The wood photos (CC0) and the tz database's places
+(public domain) keep their own terms; see Credits.
