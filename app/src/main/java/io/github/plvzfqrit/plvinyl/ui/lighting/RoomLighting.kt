@@ -9,7 +9,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import android.os.SystemClock
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.graphics.Color
+import io.github.plvzfqrit.plvinyl.core.lighting.DayPreview
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
@@ -35,8 +41,8 @@ import kotlin.math.sin
 @Composable
 fun rememberRoomLight(
     target: RoomLight,
-    /** Follow [target] exactly, no fades (a sped-up day already moves smoothly). */
-    instant: Boolean = false,
+    /** A sped-up day playing: its light is worked out at every frame instead. */
+    preview: DayPreview? = null,
 ): () -> RoomLight {
     val golden = remember { Animatable(target.golden) }
     val night = remember { Animatable(target.night) }
@@ -51,7 +57,7 @@ fun rememberRoomLight(
                 abs(target.golden - golden.value) > 0.05f || abs(target.late - late.value) > 0.05f ||
                 abs(target.dawn - dawn.value) > 0.05f || abs(target.sunHeight - height.value) > 0.1f ||
                 abs(toFrom - from.value) > 10f
-        if (fade && !instant) {
+        if (fade) {
             launch { golden.animateTo(target.golden, tween(1500)) }
             launch { late.animateTo(target.late, tween(1500)) }
             launch { dawn.animateTo(target.dawn, tween(1500)) }
@@ -63,7 +69,29 @@ fun rememberRoomLight(
             dawn.snapTo(target.dawn); height.snapTo(target.sunHeight); from.snapTo(toFrom)
         }
     }
-    return remember { { RoomLight(golden.value, night.value, late.value, dawn.value, from.value, height.value) } }
+    // A sped-up day: its light at every frame (smooth), read only while drawing. When it
+    // ends or is stopped, the light carries on from there and fades back to now.
+    val latest by rememberUpdatedState(target)
+    val previewLight = remember { mutableStateOf<RoomLight?>(null) }
+    LaunchedEffect(preview) {
+        if (preview != null) {
+            while (true) withFrameMillis { previewLight.value = preview.lightAt(SystemClock.elapsedRealtime()) }
+        }
+        val last = previewLight.value ?: return@LaunchedEffect
+        golden.snapTo(last.golden); night.snapTo(last.night); late.snapTo(last.late)
+        dawn.snapTo(last.dawn); height.snapTo(last.sunHeight); from.snapTo(last.sunFrom)
+        previewLight.value = null
+        val t = latest
+        launch { golden.animateTo(t.golden, tween(1500)) }
+        launch { late.animateTo(t.late, tween(1500)) }
+        launch { dawn.animateTo(t.dawn, tween(1500)) }
+        launch { height.animateTo(t.sunHeight, tween(1500)) }
+        launch { from.animateTo(from.value + turn(from.value, t.sunFrom), tween(1500)) }
+        night.animateTo(t.night, tween(1500))
+    }
+    return remember {
+        { previewLight.value ?: RoomLight(golden.value, night.value, late.value, dawn.value, from.value, height.value) }
+    }
 }
 
 /** The desk lamp hangs up-right of the record (where its glint is), and high. */

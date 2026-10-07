@@ -1,5 +1,6 @@
 package io.github.plvzfqrit.plvinyl.core.turntable
 
+import io.github.plvzfqrit.plvinyl.core.lighting.DayPreview
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 
 /** Everything the screen shows, apart from the moving parts (those follow the target). */
@@ -30,6 +31,6 @@ data class TurntableUiState(
     val learnedCrossfadeMs: Long = 0L,
     /** The light in the room right now. */
     val roomLight: RoomLight = RoomLight(),
-    /** While a sped-up day is playing: its local time, minutes since midnight. */
-    val previewMinute: Float? = null,
+    /** A sped-up day playing (the screen works out its light every frame), or null. */
+    val dayPreview: DayPreview? = null,
 )

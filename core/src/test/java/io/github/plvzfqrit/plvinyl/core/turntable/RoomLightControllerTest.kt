@@ -52,27 +52,27 @@ class RoomLightControllerTest {
         h.clock.minute = 12 * 60f
         c.onStart()
         h.run(200)
-        val now = c.ui.value.roomLight
         c.updateSettings { it.copy(lighting = LightingMode.Day) }  // whatever the setting, it plays the sun
         h.run(200)
         c.previewDay()
+        val preview = c.ui.value.dayPreview!!
         val nights = ArrayList<Float>()
-        repeat(48) { h.run(1_000); nights += c.ui.value.roomLight.night }
+        repeat(48) { h.run(1_000); nights += preview.lightAt(h.clock.nowMs()).night }
         assertTrue(nights.max() > 0.99f && nights.min() < 0.01f, "nights: $nights")
         h.run(1_000)
-        assertEquals(null, c.ui.value.previewMinute)
+        assertEquals(null, c.ui.value.dayPreview)
         assertEquals(RoomLight(), c.ui.value.roomLight)            // back to the Day setting
-        assertTrue(now.night < 0.01f)
     }
 
-    @Test fun `the preview shows its own clock while it plays`() {
+    @Test fun `the sped-up day keeps its own clock`() {
         h.clock.minute = 6 * 60f
         c.onStart()
         h.run(200)
         c.previewDay()
+        val preview = c.ui.value.dayPreview!!
         h.run(12_000)                                              // a quarter of the way: about noon
-        val m = c.ui.value.previewMinute
-        assertTrue(m != null && kotlin.math.abs(m - 12 * 60f) < 30f, "minute $m")
+        val m = preview.minuteAt(h.clock.nowMs())
+        assertTrue(kotlin.math.abs(m - 12 * 60f) < 30f, "minute $m")
     }
 
     @Test fun `holding the sun at a time of day shows that hour, today, and Now lets go`() {
@@ -108,7 +108,7 @@ class RoomLightControllerTest {
         c.previewDay()
         h.run(20_000)                                              // into the evening of the sped-up day
         c.stopPreviewDay()
-        assertEquals(null, c.ui.value.previewMinute)
+        assertEquals(null, c.ui.value.dayPreview)
         assertEquals(0f, c.ui.value.roomLight.night)               // noon again
     }
 }

@@ -52,11 +52,13 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,6 +99,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.plvzfqrit.plvinyl.audio.SurfaceNoise
 import io.github.plvzfqrit.plvinyl.core.history.Wear
+import io.github.plvzfqrit.plvinyl.core.lighting.DayPreview
 import io.github.plvzfqrit.plvinyl.core.lighting.RoomLight
 import io.github.plvzfqrit.plvinyl.core.model.ArmGeometry
 import io.github.plvzfqrit.plvinyl.core.model.RecordSize
@@ -131,6 +134,7 @@ import io.github.plvzfqrit.plvinyl.ui.stats.NightStatsColors
 import io.github.plvzfqrit.plvinyl.ui.stats.StatsScreen
 import io.github.plvzfqrit.plvinyl.ui.stats.statsColors
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -202,8 +206,11 @@ fun TurntableScreen(
     // Room lighting by the clock (or always day / night, from settings). While painting
     // it's daytime, so you see the true colors.
     val light = if (painting != null) RoomLight() else ui.roomLight
-    PhoneSettingsEffects(settings, lightRoom = deck.isLight && light.night < 0.5f, audible = ui.audible)
-    val roomLight = rememberRoomLight(light, instant = ui.previewMinute != null)
+    val roomLight = rememberRoomLight(light, preview = ui.dayPreview)
+    // What composition needs from the light (text and status bar colors), in coarse steps:
+    // the drawing reads it at every frame, the screen doesn't rebuild for it.
+    val nightNow by remember { derivedStateOf { (roomLight().night * 20f).roundToInt() / 20f } }
+    PhoneSettingsEffects(settings, lightRoom = deck.isLight && nightNow < 0.5f, audible = ui.audible)
     SideEffect {
         // Singles turn at 45, i.e. 1.35× faster.
         animator.spinDegPerSec = settings.spin.degPerSec * (disc?.size?.spinFactor ?: 1f)
@@ -545,7 +552,7 @@ fun TurntableScreen(
                 // Title/artist fade to the new song. Long ones scroll (marquee).
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
                     Column(Modifier.fillMaxWidth()) {
-                        val text = litTextColor(deck.contentColor, light)
+                        val text = litTextColor(deck.contentColor, RoomLight(night = nightNow))
                         MarqueeText(t, text, MaterialTheme.typography.headlineMedium)
                         if (a != null) {
                             MarqueeText(a, text.copy(alpha = 0.6f), MaterialTheme.typography.bodyMedium)
@@ -619,23 +626,16 @@ fun TurntableScreen(
 
         // While a sped-up day plays: what time it is in it, and a way to stop it early
         // (the ✕, or back).
-        ui.previewMinute?.let { minute ->
+        ui.dayPreview?.let { preview ->
             BackHandler { vm.stopPreviewDay() }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            DayPreviewPill(
+                preview,
+                onStop = vm::stopPreviewDay,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 12.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable(role = Role.Button, onClickLabel = "Stop the sped-up day") { vm.stopPreviewDay() }
-                    .padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-            ) {
-                Text(timeOfDayLabel(minute), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
-            }
+                    .padding(top = 12.dp),
+            )
         }
 
         // ---- Painting: the card on top, the real turntable as the preview.
@@ -682,7 +682,7 @@ fun TurntableScreen(
             // In the dark room the stats use the dark colors, whatever the background.
             StatsScreen(
                 history = vm.history,
-                colors = if (ui.roomLight.night > 0.5f) NightStatsColors else deck.statsColors(),
+                colors = if (nightNow > 0.5f) NightStatsColors else deck.statsColors(),
                 reveal = { PageSwipe.reveal(statsProgress.value) },
             )
         }
@@ -712,6 +712,29 @@ private fun Modifier.deckSlide(out: () -> Float): Modifier = graphicsLayer {
         alpha = if (o >= 1f) 0f else 1f
     } else {
         alpha = 1f - slope                                  // no blur before Android 12: fade
+    }
+}
+
+/**
+ * The sped-up day's time, and a ✕ to stop it. Its own little composable: it updates as
+ * the minutes fly by, without rebuilding the rest of the screen.
+ */
+@Composable
+private fun DayPreviewPill(preview: DayPreview, onStop: () -> Unit, modifier: Modifier) {
+    val minute by produceState(preview.minuteAt(SystemClock.elapsedRealtime()).toInt(), preview) {
+        while (true) withFrameMillis { value = preview.minuteAt(SystemClock.elapsedRealtime()).toInt() }
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.45f))
+            .clickable(role = Role.Button, onClickLabel = "Stop the sped-up day", onClick = onStop)
+            .padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+    ) {
+        Text(timeOfDayLabel(minute.toFloat()), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.width(8.dp))
+        Icon(Icons.Default.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
     }
 }
 
