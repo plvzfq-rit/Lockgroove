@@ -81,6 +81,7 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
     fun updateSettings(change: (Settings) -> Settings) = controller.updateSettings(change)
     fun forgetCrossfade(player: String) = controller.forgetCrossfade(player)
     fun previewDay() = controller.previewDay()
+    fun stopPreviewDay() = controller.stopPreviewDay()
     fun setLook(look: Look) {
         viewModelScope.launch { store.save(look) }
     }

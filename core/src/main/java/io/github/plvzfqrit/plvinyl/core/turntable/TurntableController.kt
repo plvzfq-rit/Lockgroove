@@ -168,6 +168,14 @@ class TurntableController(
         tick()
     }
 
+    /** Stop the sped-up day early: back to the light of now. */
+    fun stopPreviewDay() {
+        previewStartedAt = null
+        previewMinute = null
+        lightMode = null                                     // recompute the light right away
+        tick()
+    }
+
     /** The app left the screen. */
     fun onStop() {
         previewStartedAt = null

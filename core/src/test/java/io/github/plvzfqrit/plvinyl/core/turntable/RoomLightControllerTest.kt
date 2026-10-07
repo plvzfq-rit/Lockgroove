@@ -98,4 +98,17 @@ class RoomLightControllerTest {
         h.run(200)
         assertEquals(RoomLight(), c.ui.value.roomLight)
     }
+
+    @Test fun `a sped-up day can be stopped early, back to now`() {
+        h.clock.zone = "Africa/Accra"
+        h.clock.wall = day + 12 * 3_600_000L
+        h.clock.minute = 12 * 60f
+        c.onStart()
+        h.run(200)
+        c.previewDay()
+        h.run(20_000)                                              // into the evening of the sped-up day
+        c.stopPreviewDay()
+        assertEquals(null, c.ui.value.previewMinute)
+        assertEquals(0f, c.ui.value.roomLight.night)               // noon again
+    }
 }
