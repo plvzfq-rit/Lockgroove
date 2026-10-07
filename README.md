@@ -16,9 +16,12 @@ No ads, no account, no internet permission. Everything stays on your phone.
   land on gets a record swap.
 - **Grab the arm** and drop it anywhere to cue that point in the song, or **swipe the
   record** to change songs.
-- **7" singles and 12" LPs**, picked from the song's length. Four backgrounds, four
-  vinyl finishes (including marbled vinyl coloured from the album art), and record
-  wear that builds up the more you play something.
+- **7" singles and 12" LPs**, picked from the song's length. Four backgrounds (or your
+  own paint), four vinyl finishes (including marbled vinyl coloured from the album
+  art), and record wear that builds up the more you play something.
+- **Paint it.** Give the deck and the front panel your own colors: hand-picked hi-fi
+  paints in one tap, or any color with hue / saturation / lightness sliders, previewed
+  live on the turntable itself.
 - **Room lighting** that follows the clock: daylight, golden hour, and a desk lamp at
   night.
 - **Liner notes:** swipe left for your listening stats (most played, top artist, when
