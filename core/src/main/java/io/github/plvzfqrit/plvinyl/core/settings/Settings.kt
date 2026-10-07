@@ -49,6 +49,8 @@ data class Settings(
     /** How smoothly (and how often) the record is redrawn. */
     val motion: MotionQuality = MotionQuality.Balanced,
     val keepScreenOn: Boolean = true,
+    /** While the screen is kept on for a record, dim it when nobody has touched it for a while. */
+    val dimWhenIdle: Boolean = true,
     val haptics: Boolean = true,
     /** The app's own repeat one (the ↻1 key): at the end, the same record plays again. */
     val repeatOne: Boolean = false,

@@ -30,6 +30,7 @@ class SettingsStore(context: Context) {
             grooveGlints = p[GLINTS] ?: d.grooveGlints,
             motion = enumOr(p[MOTION], d.motion),
             keepScreenOn = p[SCREEN_ON] ?: d.keepScreenOn,
+            dimWhenIdle = p[DIM_WHEN_IDLE] ?: d.dimWhenIdle,
             haptics = p[HAPTICS] ?: d.haptics,
             repeatOne = p[REPEAT_ONE] ?: d.repeatOne,
             lighting = enumOr(p[LIGHTING], d.lighting),
@@ -63,6 +64,7 @@ class SettingsStore(context: Context) {
             p[GLINTS] = s.grooveGlints
             p[MOTION] = s.motion.name
             p[SCREEN_ON] = s.keepScreenOn
+            p[DIM_WHEN_IDLE] = s.dimWhenIdle
             p[HAPTICS] = s.haptics
             p[REPEAT_ONE] = s.repeatOne
             p[LIGHTING] = s.lighting.name
@@ -99,6 +101,7 @@ class SettingsStore(context: Context) {
         val GLINTS = booleanPreferencesKey("groove_glints")
         val MOTION = stringPreferencesKey("motion")
         val SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val DIM_WHEN_IDLE = booleanPreferencesKey("dim_when_idle")
         val HAPTICS = booleanPreferencesKey("haptics")
         val REPEAT_ONE = booleanPreferencesKey("repeat_one")
         val LIGHTING = stringPreferencesKey("lighting")

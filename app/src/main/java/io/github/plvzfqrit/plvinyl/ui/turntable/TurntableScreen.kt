@@ -9,6 +9,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -62,6 +63,7 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -222,7 +224,9 @@ fun TurntableScreen(
     // How often what moves is redrawn (the record, a long title): the biggest battery
     // cost. Lighter when the phone is warm or saving battery. Everything moving keeps the
     // same beat, so it all repaints together.
-    val phone = rememberPhoneState(dimmed = false)
+    // Dimmed: a record has played a while with nobody touching the phone (see below).
+    var dimmed by remember { mutableStateOf(false) }
+    val phone = rememberPhoneState(dimmed = dimmed)
     val pace = MotionPolicy.pace(settings.motion, settings.spin, phone)
     val beat = rememberBeat(pace.framesPerSecond)
     SideEffect {
@@ -271,6 +275,17 @@ fun TurntableScreen(
         if (settings.dustCover) coverClosed = true
     }
 
+    // ---------------- Dimming ----------------
+    // A record playing with the screen kept on, and nobody has touched the phone for a
+    // while: the room dims (a dark veil, drawn last) and motion gets lighter. A touch, or
+    // the music stopping, brings it back.
+    LaunchedEffect(lastTouch, ui.playing, settings.dimWhenIdle, settings.keepScreenOn) {
+        dimmed = false
+        if (!ui.playing || !settings.dimWhenIdle || !settings.keepScreenOn) return@LaunchedEffect
+        delay(DIM_IDLE_MS)
+        dimmed = true
+    }
+
     // ---------------- Stats ("Liner notes") ----------------
     // One progress value, 0 = turntable, 1 = stats (see the core's PageSwipe).
     val statsProgress = remember { Animatable(0f) }
@@ -298,7 +313,7 @@ fun TurntableScreen(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    if (painting != null || choosingTime) return@awaitEachGesture // no stats meanwhile
+                    if (painting != null || choosingTime || dimmed) return@awaitEachGesture // no stats meanwhile
                     val startP = statsProgress.value
                     val startedOpen = PageSwipe.startsOpen(startP)
                     var dx = 0f
@@ -744,6 +759,15 @@ fun TurntableScreen(
                 beat = beat,
             )
         }
+
+        // ---- Dimmed: a dark veil over everything (on OLED, dark pixels barely use power).
+        // It never brightens anything, whatever the phone's own brightness is. While it's
+        // dimmed, the first touch only wakes it, so it can't press a key by accident.
+        val veil = animateFloatAsState(if (dimmed) DIM_VEIL else 0f, tween(if (dimmed) 1500 else 300), label = "dim")
+        Box(Modifier.fillMaxSize().drawBehind { if (veil.value > 0f) drawRect(Color.Black.copy(alpha = veil.value)) })
+        if (dimmed) {
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { awaitEachGesture { awaitFirstDown().consume() } })
+        }
     }
 }
 
@@ -825,6 +849,12 @@ private fun PhoneSettingsEffects(settings: Settings, lightRoom: Boolean, audible
         window.attributes = window.attributes.apply { preferredDisplayModeId = modeId }
     }
 }
+
+/** The screen dims after this long without a touch while a record plays. */
+private const val DIM_IDLE_MS = 5 * 60 * 1000L
+
+/** How dark the veil over a dimmed screen is. */
+private const val DIM_VEIL = 0.6f
 
 /** The platter motor switches off after this long with nothing playing and no touches. */
 private const val MOTOR_IDLE_MS = 30 * 1000L

@@ -349,6 +349,12 @@ fun SettingsSheet(
                     fg = fg, bg = bg,
                 ) { tick(); onSettings(settings.copy(keepScreenOn = it)) }
                 ToggleRow(
+                    title = "Dim when nobody's watching",
+                    subtitle = "With the screen kept on, it dims after 5 minutes without a touch. A touch brings it back",
+                    checked = settings.dimWhenIdle,
+                    fg = fg, bg = bg,
+                ) { tick(); onSettings(settings.copy(dimWhenIdle = it)) }
+                ToggleRow(
                     title = "Haptics",
                     subtitle = "Button clicks, needle drop, and arm ticks",
                     checked = settings.haptics,

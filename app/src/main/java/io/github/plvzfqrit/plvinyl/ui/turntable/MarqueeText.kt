@@ -73,16 +73,19 @@ fun MarqueeText(
         val travel = textWidth + constraints.maxWidth * GAP
         val offset = remember(text) { mutableFloatStateOf(0f) }
         val keepGoing by rememberUpdatedState(scrolling)
+        val maxPasses by rememberUpdatedState(passes)
         val latestBeat by rememberUpdatedState(beat)
         val pxPerSecond = with(LocalDensity.current) { Velocity.toPx() }
-        LaunchedEffect(text, travel, passes, onScreen) {
+        // (The passes allowed can change on the way, e.g. when the screen dims: read, not
+        // restarted, so the text doesn't jump back to the start.)
+        LaunchedEffect(text, travel, onScreen) {
             offset.floatValue = 0f
             if (!onScreen) return@LaunchedEffect
             var done = 0
-            while (done < passes) {
-                snapshotFlow { keepGoing }.first { it }          // rest until it may move
+            while (true) {
+                snapshotFlow { keepGoing && done < maxPasses }.first { it }   // rest until it may move
                 delay(PAUSE_MS)
-                if (!keepGoing) continue
+                if (!keepGoing || done >= maxPasses) continue
                 // One pass at a steady speed, moved inside the beat's frames (so it repaints
                 // with the record). Finished even if [scrolling] stops on the way; at the
                 // end, back to 0 looks the same (the copy has arrived).
