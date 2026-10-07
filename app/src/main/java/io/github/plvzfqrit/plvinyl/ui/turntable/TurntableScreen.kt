@@ -562,7 +562,8 @@ fun TurntableScreen(
                     settings = settings,
                     learnedCrossfadeMs = ui.learnedCrossfadeMs,
                     // Going Custom keeps the paint (or starts from the current background's color).
-                    onSelect = { vm.setLook(look.copy(backdrop = it)) },
+                    // A preset is the whole look: its own front panel comes back with it.
+                    onSelect = { vm.setLook(look.copy(backdrop = it, panelPaint = null)) },
                     onPaint = { customDeck ->
                         showSettings = false
                         // Going Custom starts from the paint so far (or the current background's color).
@@ -580,13 +581,12 @@ fun TurntableScreen(
 
         // ---- Painting: the card on top, the real turntable as the preview.
         painting?.let { target ->
-            // Taps on the turntable choose what to paint; nothing else reacts meanwhile.
+            // While the card is open the turntable is only a preview: touches on it do
+            // nothing, so a key or the arm can't be bumped by accident.
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(panelTop) {
-                        detectTapGestures { p -> painting = if (p.y >= panelTop) PaintTarget.Panel else PaintTarget.Deck }
-                    }
+                    .pointerInput(Unit) { detectTapGestures { } }
             )
             BackHandler { draft = null; painting = null }
             PaintCard(

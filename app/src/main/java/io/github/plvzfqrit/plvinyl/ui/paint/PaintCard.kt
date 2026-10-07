@@ -156,11 +156,6 @@ fun PaintCard(
         ) {
             slide(hsl.copy(l = MIN_L + it * (MAX_L - MIN_L)))
         }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Tap the deck or the front panel to paint it",
-            color = Muted, fontSize = 12.sp,
-        )
     }
 }
 
