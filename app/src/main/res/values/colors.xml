@@ -2,4 +2,6 @@
 <resources>
     <!-- The charcoal deck, shown while the app starts. -->
     <color name="plinth">#FF2E2E2E</color>
+    <!-- Backdrop of the launcher icon, matching the logo's orange. -->
+    <color name="ic_launcher_background">#FFF19A1B</color>
 </resources>
