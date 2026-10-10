@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="160" alt="Lockgroove logo"></p>
+
 # Lockgroove
 
 Whatever you're playing in Spotify, YouTube Music or any other player, shown as a record
@@ -128,6 +130,8 @@ and Claude wrote most of the code to match.
 
 ## Credits
 
+- Logo by Lahdine Jeah Mabalot, licensed under
+  [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
 - Walnut and oak: CC0 veneer scans from [Poly Haven](https://polyhaven.com)
   (*Black Walnut Veneer 02* and *Red Oak Veneer*), cropped and given an oiled finish by
   [`tools/make_wood.py`](tools/make_wood.py).
@@ -137,7 +141,14 @@ and Claude wrote most of the code to match.
 
 Copyright © 2026 James Christian Ruiz.
 
-Lockgroove is free software under the [GNU General Public License v3.0](LICENSE): you can
-use it, change it and share it, and if you share a changed version, its source has to be
-shared under the same license. The wood photos (CC0) and the tz database's places
-(public domain) keep their own terms; see Credits.
+Lockgroove's code is free software under the [GNU General Public License v3.0](LICENSE):
+you can use it, change it and share it, and if you share a changed version, its source has
+to be shared under the same license.
+
+The Lockgroove logo and the launcher icons made from it are © 2026 Lahdine Jeah Mabalot,
+licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). You can
+share and adapt them for non-commercial use as long as you credit her; they are not covered
+by the GPL.
+
+The wood photos (CC0) and the tz database's places (public domain) keep their own terms;
+see Credits.
