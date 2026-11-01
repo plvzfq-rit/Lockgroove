@@ -194,7 +194,7 @@ class PlaybackArbiter(private val clock: Clock) {
          * registered the skip yet: a pause 2 ms behind it left Spotify stuck buffering. Spotify's
          * sound starts about 260 ms after a skip, and it takes a moment to obey a pause.
          */
-        const val SKIP_SILENCE_DELAY_MS = 120L
+        const val SKIP_SILENCE_DELAY_MS = 60L
 
         /** A pause the player does by itself must last this long before the needle lifts. */
         const val SELF_PAUSE_GRACE_MS = 1500L
