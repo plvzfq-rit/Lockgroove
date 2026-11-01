@@ -62,6 +62,7 @@ import io.github.plvzfqrit.lockgroove.core.lighting.LightingMode
 import io.github.plvzfqrit.lockgroove.core.look.Paint
 import io.github.plvzfqrit.lockgroove.core.model.RecordSizeChoice
 import io.github.plvzfqrit.lockgroove.core.settings.MotionQuality
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
 import io.github.plvzfqrit.lockgroove.core.settings.Scale
 import io.github.plvzfqrit.lockgroove.core.settings.Scales
 import io.github.plvzfqrit.lockgroove.core.settings.Settings
@@ -207,6 +208,14 @@ fun SettingsSheet(
                     checked = settings.pulseTitle,
                     fg = fg, bg = bg,
                 ) { tick(); onSettings(settings.copy(pulseTitle = it)) }
+                if (LyricsFeature.available) {
+                    ToggleRow(
+                        title = "Simplified Chinese lyrics",
+                        subtitle = "Show traditional Chinese lyrics in simplified characters",
+                        checked = settings.simplifiedChinese,
+                        fg = fg, bg = bg,
+                    ) { tick(); onSettings(settings.copy(simplifiedChinese = it)) }
+                }
 
             } }
             item { Column(Modifier.fillMaxWidth()) {

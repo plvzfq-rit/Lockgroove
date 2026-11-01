@@ -76,6 +76,9 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onIntent(intent: UserIntent) = controller.onIntent(intent)
+
+    /** Where the song is now (ms): for the lyrics, which poll it themselves (a flow would redraw everything). */
+    fun positionMs(): Long? = controller.positionMs()
     fun onMoveStarted(move: Move, deck: Deck) = controller.onMoveStarted(move, deck)
     fun onMoveFinished(move: Move, deck: Deck) = controller.onMoveFinished(move, deck)
     fun updateSettings(change: (Settings) -> Settings) = controller.updateSettings(change)

@@ -7,6 +7,8 @@ on a turntable. The needle drives the music: lift the arm and the song pauses, d
 anywhere on the record and it plays from there.
 
 No ads, no account, no internet permission. Everything stays on your phone.
+(There is an optional second build with lyrics, which does ask for the internet: see
+[Building](#building).)
 
 It's named after the locked groove: the endless loop at the very end of a record, where
 the needle goes round and round until someone lifts it.
@@ -111,8 +113,19 @@ notification sound or a paused Chrome tab doesn't steal the session"*.
 Android Studio (AGP 9), JDK 17+, min SDK 24.
 
 ```
-./gradlew :app:installRelease
+./gradlew :app:installStandardRelease
 ```
+
+There are two builds of the same app:
+
+- **standard**: the app described above. It has no internet permission at all.
+- **withLyrics**: the same app, installed beside it as a separate app (`.lyrics`), plus the
+  internet permission and one extra feature. In landscape, a **Show lyrics** button appears
+  under the artist's name. Nothing is looked up until you tap it and allow it; after that
+  the song's title, artist and length are sent to [lrclib.net](https://lrclib.net) to fetch
+  synced lyrics. The ✕ turns it off again. Build it with `./gradlew :app:installWithLyricsRelease`.
+
+In Android Studio, pick the one you want in the **Build Variants** panel.
 
 Release builds have R8 on and are signed with the debug key, so they install on your
 own phone. On first launch the app asks for notification access: that's how Android
