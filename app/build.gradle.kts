@@ -50,6 +50,12 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            // Kuromoji's two jars both ship the same notes files: keep one copy of each.
+            pickFirsts += listOf("META-INF/CONTRIBUTORS.md", "META-INF/LICENSE.md", "META-INF/NOTICE.md")
+        }
+    }
 }
 
 dependencies {
@@ -68,6 +74,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.profileinstaller)
+    // The Japanese dictionary (it reads kanji in context). Only the lyrics build has it.
+    "withLyricsImplementation"(libs.kuromoji.ipadic)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

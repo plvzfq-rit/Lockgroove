@@ -22,6 +22,15 @@ class LyricScriptsTest {
         assertTrue(LyricScripts.needsRomanization("I love 你"))
     }
 
+    @Test fun `a line with kana is japanese, one with only han is not`() {
+        assertTrue(LyricScripts.isJapanese("愛してる"))
+        assertTrue(LyricScripts.isJapanese("こんにちは"))
+        assertTrue(LyricScripts.isJapanese("カタカナ"))
+        assertFalse(LyricScripts.isJapanese("你好吗"))
+        assertFalse(LyricScripts.isJapanese("한국어"))
+        assertFalse(LyricScripts.isJapanese("hello"))
+    }
+
     @Test fun `only han without kana or hangul counts as chinese`() {
         assertTrue(LyricScripts.isChinese("你好吗"))
         assertTrue(LyricScripts.isChinese("I love 你"))

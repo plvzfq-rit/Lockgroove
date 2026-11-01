@@ -124,6 +124,10 @@ There are two builds of the same app:
   under the artist's name. Nothing is looked up until you tap it and allow it; after that
   the song's title, artist and length are sent to [lrclib.net](https://lrclib.net) to fetch
   synced lyrics. The ✕ turns it off again. Build it with `./gradlew :app:installWithLyricsRelease`.
+  Songs in Chinese, Korean, Japanese, Arabic and other scripts also get a reading in Latin
+  letters under the line (pinyin with tone marks, romaji, and so on), and traditional Chinese
+  can be shown in simplified characters (a Settings toggle). It is about 13 MB bigger than the
+  standard build, because it carries a Japanese dictionary to read kanji in context.
 
 In Android Studio, pick the one you want in the **Build Variants** panel.
 
@@ -148,6 +152,11 @@ and Claude wrote most of the code to match.
 - Walnut and oak: CC0 veneer scans from [Poly Haven](https://polyhaven.com)
   (*Black Walnut Veneer 02* and *Red Oak Veneer*), cropped and given an oiled finish by
   [`tools/make_wood.py`](tools/make_wood.py).
+- Lyrics (the *withLyrics* build only): synced lyrics from [LRCLIB](https://lrclib.net), a
+  free community service.
+- Japanese readings (the *withLyrics* build only): [Kuromoji](https://github.com/atilika/kuromoji)
+  by Atilika (Apache-2.0), with the IPADIC dictionary (© Nara Institute of Science and
+  Technology; its notice ships inside the library).
 - Where the sun is: the reference cities in the tz database's `zone.tab` (public domain).
 
 ## License

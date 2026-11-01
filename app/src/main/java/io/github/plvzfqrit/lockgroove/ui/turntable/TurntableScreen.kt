@@ -64,7 +64,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import io.github.plvzfqrit.lockgroove.core.lyrics.LyricLine
+import io.github.plvzfqrit.lockgroove.core.lyrics.LyricScripts
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricsTracker
+import io.github.plvzfqrit.lockgroove.lyrics.JapaneseReaders
+import io.github.plvzfqrit.lockgroove.lyrics.Romanizer
 import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
 import kotlinx.coroutines.isActive
 import io.github.plvzfqrit.lockgroove.ui.common.rememberBreath
@@ -387,14 +391,34 @@ fun TurntableScreen(
         val lyricsSong = "${ui.title}|${ui.artist}|${ui.durationMs}"
         var retriedSong by remember { mutableStateOf("") }
         var retryCount by remember { mutableIntStateOf(0) }
-        val lyricsState by produceState<LyricsState>(LyricsState.Looking, lyricsSong, ui.player, lyricsOn, retryCount) {
-            value = LyricsState.Looking
+        // Step 1: the lyrics as fetched (null while still asking; empty when there are none).
+        val fetchedLyrics by produceState<List<LyricLine>?>(null, lyricsSong, ui.player, lyricsOn, retryCount) {
+            value = null
             val source = LyricsFeature.source()
             if (!lyricsOn || source == null || ui.player == null) return@produceState
             val retrying = retriedSong == lyricsSong
             if (!retrying) delay(800)                               // skipping through songs asks for nothing
-            val found = source.find(ui.title, ui.artist, ui.durationMs, fresh = retrying)
-            value = if (found.isNullOrEmpty()) LyricsState.None else LyricsState.Found(found)
+            value = source.find(ui.title, ui.artist, ui.durationMs, fresh = retrying).orEmpty()
+        }
+        // Step 2: the finished lines and their Latin-letter readings, worked out once per song in
+        // the background (a dictionary lookup must never run while the screen is being drawn).
+        val simplifiedChinese = settings.simplifiedChinese
+        val lyricsState by produceState<LyricsState>(LyricsState.Looking, fetchedLyrics, simplifiedChinese) {
+            val fetched = fetchedLyrics
+            value = when {
+                fetched == null -> LyricsState.Looking
+                fetched.isEmpty() -> LyricsState.None
+                else -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val shown = if (simplifiedChinese) {
+                        fetched.map { if (LyricScripts.isChinese(it.text)) it.copy(text = Romanizer.simplify(it.text)) else it }
+                    } else fetched
+                    LyricsState.Found(shown, shown.map { Romanizer.romanize(it.text) })
+                }
+            }
+        }
+        // Lyrics off: let go of the Japanese dictionary (it is big); it loads again if lyrics come back.
+        LaunchedEffect(lyricsOn) {
+            if (!lyricsOn) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { JapaneseReaders.reader()?.release() }
         }
         var lyricsIndex by remember { mutableIntStateOf(-1) }
         val foundLyrics = lyricsState as? LyricsState.Found
@@ -729,7 +753,6 @@ fun TurntableScreen(
                         onShow = { askLyrics = true },
                         onHide = { vm.updateSettings { it.copy(lyrics = false) } },
                         onRetry = { retriedSong = lyricsSong; retryCount++ },
-                        simplified = settings.simplifiedChinese,
                         modifier = Modifier.weight(1f).padding(top = 12.dp),
                     )
                 }

@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,8 +24,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricLine
-import io.github.plvzfqrit.lockgroove.core.lyrics.LyricScripts
-import io.github.plvzfqrit.lockgroove.lyrics.Romanizer
 
 /** What the lyrics area knows about the song being played (once the listener has allowed lyrics). */
 sealed interface LyricsState {
@@ -36,7 +33,8 @@ sealed interface LyricsState {
     /** No synced lyrics, or the lookup failed (offline, say). */
     data object None : LyricsState
 
-    data class Found(val lines: List<LyricLine>) : LyricsState
+    /** [readings] has one entry per line: its Latin-letter reading, or null when it needs none. */
+    data class Found(val lines: List<LyricLine>, val readings: List<String?>) : LyricsState
 }
 
 /**
@@ -55,8 +53,6 @@ fun LyricsPanel(
     onHide: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
-    /** Show Chinese lines in simplified characters. */
-    simplified: Boolean = false,
 ) {
     Box(modifier.fillMaxWidth()) {
         if (!on) {
@@ -88,12 +84,8 @@ fun LyricsPanel(
                 }
                 // One lyric at a time, with its Latin-letter reading under it when it is in another script.
                 is LyricsState.Found -> Crossfade(targetState = index, animationSpec = tween(250), label = "lyric") { i ->
-                    val line = remember(i, simplified) {
-                        state.lines.getOrNull(i)?.let {
-                            if (simplified && LyricScripts.isChinese(it.text)) it.copy(text = Romanizer.simplify(it.text)) else it
-                        }
-                    }
-                    val reading = remember(line) { line?.text?.let(Romanizer::romanize) }
+                    val line = state.lines.getOrNull(i)
+                    val reading = state.readings.getOrNull(i)
                     Column {
                         Line(line, color, 16, FontWeight.SemiBold, maxLines = 3)
                         if (reading != null) Line(LyricLine(0, reading), color.copy(alpha = 0.6f), 12, FontWeight.Normal, maxLines = 2)

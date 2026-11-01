@@ -15,6 +15,12 @@ object LyricScripts {
         return kana && Character.UnicodeScript.HAN in found
     }
 
+    /** The line has hiragana or katakana: it is Japanese (kanji alone can't be told from Chinese). */
+    fun isJapanese(text: String): Boolean {
+        val found = scripts(text)
+        return Character.UnicodeScript.HIRAGANA in found || Character.UnicodeScript.KATAKANA in found
+    }
+
     /**
      * Chinese: Han characters with no kana (Japanese) or Hangul (Korean) beside them. Only these
      * lines can be switched between traditional and simplified characters.
