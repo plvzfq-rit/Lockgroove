@@ -19,6 +19,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Two builds of the same app. "standard" has no internet permission at all. "withLyrics" adds
+    // it, and the lyrics feature that needs it. (Android Studio picks the alphabetically first
+    // flavor by default, which is why this one isn't called "lyrics".)
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") {
+            dimension = "edition"
+        }
+        create("withLyrics") {
+            dimension = "edition"
+            applicationIdSuffix = ".lyrics"
+            versionNameSuffix = "-lyrics"
+        }
+    }
+
     buildTypes {
         release {
             optimization {
