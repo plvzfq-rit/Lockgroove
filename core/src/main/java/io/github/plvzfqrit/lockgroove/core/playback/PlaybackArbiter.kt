@@ -52,6 +52,9 @@ class PlaybackArbiter(private val clock: Clock) {
     private var acted = true
     private var lastSafetyCheck = 0L
 
+    // When to silence a player that auto-plays after our skip; 0 = nothing due.
+    private var silenceAt = 0L
+
     /** Take over the player's current state as-is (app just opened). Sends nothing. */
     fun adopt(playing: Boolean) {
         wantPlaying = playing
@@ -115,9 +118,21 @@ class PlaybackArbiter(private val clock: Clock) {
         return onTick()
     }
 
+    /**
+     * A skip just went out. Players auto-play after one, so a pause follows shortly, timed
+     * to land after the player has taken the skip in but before its sound starts.
+     */
+    fun onSkipSent() {
+        silenceAt = clock.nowMs() + SKIP_SILENCE_DELAY_MS
+    }
+
     /** Grace periods expire here; call it regularly. */
     fun onTick(): List<PlayerCommand> {
         val now = clock.nowMs()
+        if (silenceAt != 0L && now >= silenceAt) {
+            silenceAt = 0L
+            return command(false)
+        }
         val s = seen ?: return emptyList()
         // Just back in the app: let the snap happen first.
         if (now < resumeGraceUntil) return emptyList()
@@ -174,6 +189,13 @@ class PlaybackArbiter(private val clock: Clock) {
     }
 
     companion object {
+        /**
+         * How long after a skip the silencing pause goes out. Too early and the player hasn't
+         * registered the skip yet: a pause 2 ms behind it left Spotify stuck buffering. Spotify's
+         * sound starts about 260 ms after a skip, and it takes a moment to obey a pause.
+         */
+        const val SKIP_SILENCE_DELAY_MS = 120L
+
         /** A pause the player does by itself must last this long before the needle lifts. */
         const val SELF_PAUSE_GRACE_MS = 1500L
 

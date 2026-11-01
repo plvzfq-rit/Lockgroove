@@ -309,7 +309,10 @@ class TurntableController(
                 positionMs = s?.let { PositionTracker.positionAt(it, now) }, settledKey = settled?.key,
             )
             for (e in effects) when (e) {
-                is SkipEffect.Send -> send(e.command)
+                is SkipEffect.Send -> {
+                    send(e.command)
+                    if (e.command == PlayerCommand.Next || e.command == PlayerCommand.Previous) arbiter.onSkipSent()
+                }
             }
         }
         sendAll(arbiter.onTick())

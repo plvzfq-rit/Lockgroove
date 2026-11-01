@@ -119,4 +119,15 @@ class PlaybackArbiterTest {
         report(playing = true, touching = true)
         assertEquals(listOf(PlayerCommand.Pause), arbiter.onNeedleUp())
     }
+
+    @Test fun `a skip is followed by one pause, a moment later and not before`() {
+        arbiter.onSkipSent()
+        assertEquals(emptyList(), arbiter.onTick())
+        clock.advance(PlaybackArbiter.SKIP_SILENCE_DELAY_MS - 1)
+        assertEquals(emptyList(), arbiter.onTick())
+        clock.advance(1)
+        assertEquals(listOf(PlayerCommand.Pause), arbiter.onTick())
+        clock.advance(1_000)
+        assertEquals(emptyList(), arbiter.onTick())              // only the one
+    }
 }
