@@ -371,8 +371,8 @@ fun TurntableScreen(
         val landscape = maxWidth > maxHeight
         val platterSize = if (landscape) maxHeight * LANDSCAPE_PLATTER else maxWidth * 1.213f
         val platterRadius = platterSize / 2
-        val platterTop = if (landscape) (maxHeight - platterSize) / 2 else (maxHeight - platterSize) / 2 * (1 - 0.65f)
-        val platterLeft = if (landscape) -platterSize * 0.06f else (maxWidth - platterSize) / 2 * (1 + 2.13f)
+        val platterTop = if (landscape) maxHeight * LANDSCAPE_SPINDLE_Y - platterRadius else (maxHeight - platterSize) / 2 * (1 - 0.65f)
+        val platterLeft = if (landscape) -platterSize * LANDSCAPE_BLEED else (maxWidth - platterSize) / 2 * (1 + 2.13f)
         val spindleX = platterLeft + platterRadius
         val spindleY = platterTop + platterRadius
         val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -924,8 +924,14 @@ private fun PhoneSettingsEffects(settings: Settings, lightRoom: Boolean, audible
 }
 
 /** The screen dims after this long without a touch while a record plays. */
-/** Landscape: how much of the screen's height the platter takes. */
-private const val LANDSCAPE_PLATTER = 0.94f
+/**
+ * Landscape: the platter is bigger than the screen is tall and bleeds off the left and bottom,
+ * like the portrait one. Its centre sits low enough that the arm's base plate (about one
+ * radius above the spindle) stays on screen.
+ */
+private const val LANDSCAPE_PLATTER = 1.10f      // of the screen's height
+private const val LANDSCAPE_SPINDLE_Y = 0.58f    // of the screen's height
+private const val LANDSCAPE_BLEED = 0.22f        // of the platter, off the left edge
 
 private const val DIM_IDLE_MS = 5 * 60 * 1000L
 
