@@ -124,8 +124,9 @@ There are two builds of the same app:
   artist's name, in portrait and in landscape. **Nothing is looked up by itself**: only when you
   tap it for a song, and only after you allow it once. Then the song's title, artist and length
   are sent to [lrclib.net](https://lrclib.net) to fetch synced lyrics. The lyrics you get are
-  kept on the phone (in the app's private storage, up to 500 songs), so a song is never looked
-  up twice, and turning the phone or leaving the app doesn't ask again. In Settings you can turn
+  kept on the phone (in the app's private storage, up to 500 songs) for 90 days, so a song is
+  not looked up twice in that time, and turning the phone or leaving the app doesn't ask again.
+  After 90 days the button comes back for that song and a tap fetches a fresh copy. In Settings you can turn
   lookups off and clear the saved lyrics. Build it with `./gradlew :app:installWithLyricsRelease`.
   Songs in Chinese, Korean, Japanese, Arabic and other scripts also get a reading in Latin
   letters under the line (pinyin with tone marks, romaji, and so on), and traditional Chinese

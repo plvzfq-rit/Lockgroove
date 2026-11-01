@@ -62,6 +62,7 @@ import io.github.plvzfqrit.lockgroove.core.lighting.LightingMode
 import io.github.plvzfqrit.lockgroove.core.look.Paint
 import io.github.plvzfqrit.lockgroove.core.model.RecordSizeChoice
 import io.github.plvzfqrit.lockgroove.core.settings.MotionQuality
+import io.github.plvzfqrit.lockgroove.core.lyrics.SavedLyrics
 import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
 import io.github.plvzfqrit.lockgroove.core.settings.Scale
 import io.github.plvzfqrit.lockgroove.core.settings.Scales
@@ -230,9 +231,9 @@ fun SettingsSheet(
                             Text("Saved lyrics", fontSize = 15.sp)
                             Text(
                                 text = when (savedLyrics) {
-                                    0 -> "None yet: songs you get lyrics for are kept on this phone"
-                                    1 -> "1 song's lyrics are kept on this phone"
-                                    else -> "$savedLyrics songs' lyrics are kept on this phone"
+                                    0 -> "None yet: lyrics you get are kept on this phone for ${SavedLyrics.MAX_AGE_DAYS} days"
+                                    1 -> "1 song's lyrics, kept for up to ${SavedLyrics.MAX_AGE_DAYS} days"
+                                    else -> "$savedLyrics songs' lyrics, kept for up to ${SavedLyrics.MAX_AGE_DAYS} days"
                                 },
                                 fontSize = 12.sp,
                                 color = fg.copy(alpha = 0.6f),

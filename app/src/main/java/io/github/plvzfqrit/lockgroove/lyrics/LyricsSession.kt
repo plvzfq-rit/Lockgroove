@@ -72,13 +72,16 @@ class LyricsSession(
 
     init {
         if (LyricsFeature.available) {
-            scope.launch(Dispatchers.IO) { _saved.value = store.count() }
+            scope.launch(Dispatchers.IO) {
+                store.purgeExpired()                                            // old lyrics go; the button returns for those songs
+                _saved.value = store.count()
+            }
             scope.launch {
                 songs.collect { song ->
                     current.value = song
                     // A new song: only look at what is saved on the phone. No network.
                     if (song != null && song.key !in results.value) {
-                        val saved = withContext(Dispatchers.IO) { store.read(song.key) }
+                        val saved = withContext(Dispatchers.IO) { store.read(song.key).also { _saved.value = store.count() } }
                         if (saved != null) results.update { it + (song.key to LyricsResult.Found(saved)) }
                     }
                 }
