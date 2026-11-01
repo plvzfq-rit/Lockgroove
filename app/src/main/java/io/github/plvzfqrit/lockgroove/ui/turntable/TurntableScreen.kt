@@ -239,6 +239,16 @@ fun TurntableScreen(
 
     val counts by vm.history.counts.collectAsStateWithLifecycle()
 
+    // A player stuck buffering gets a breathing label, but only once it has lasted a couple
+    // of seconds: the usual half-second hiccup shows nothing.
+    var showBuffering by remember { mutableStateOf(false) }
+    LaunchedEffect(ui.buffering) {
+        if (ui.buffering) {
+            delay(2_000)
+            showBuffering = true
+        } else showBuffering = false
+    }
+
     // ---------------- Surface noise ----------------
     // Crackle while the needle is on a sounding record, the locked-groove thump in the
     // lead-out, silence otherwise (and whenever the app isn't on screen).
@@ -446,6 +456,7 @@ fun TurntableScreen(
                         size = disc.size,
                         title = disc.title,
                         artist = disc.artist,
+                        buffering = showBuffering,
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {

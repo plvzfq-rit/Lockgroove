@@ -2,6 +2,12 @@ package io.github.plvzfqrit.lockgroove.ui.drawing
 
 import io.github.plvzfqrit.lockgroove.core.model.RecordSize
 import android.graphics.Bitmap
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -110,6 +116,8 @@ fun VinylRecord(
     artist: String? = null,
     /** 0 = fresh, 1 = played to death: scuffs, spindle marks, a duller shine. */
     wear: Float = 0f,
+    /** The player is stuck buffering: the label breathes until the music really starts. */
+    buffering: Boolean = false,
 ) {
     val artImage = remember(art) { art?.asImageBitmap() }
     val seed = remember(seedKey) { seedKey.hashCode() }
@@ -164,6 +172,26 @@ fun VinylRecord(
                 .graphicsLayer { rotationZ = rotation() }
         ) {
             drawImage(disc, filterQuality = FilterQuality.Low)   // bilinear: smooth while rotating
+        }
+        // Stuck buffering: a faint glow breathes on the label. It only exists while needed, and
+        // its fade runs in the layer, so nothing is redrawn or recomposed per frame.
+        if (buffering) {
+            val pulse by rememberInfiniteTransition(label = "buffering").animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "pulse",
+            )
+            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = 0.05f + 0.30f * pulse }) {
+                val r = this.size.minDimension / 2f * format.radiusOfPlatter
+                val label = Path().apply {
+                    fillType = PathFillType.EvenOdd
+                    addOval(Rect(center, r * format.label))
+                    addOval(Rect(center, r * format.hole))                // keep the spindle clear
+                }
+                drawPath(label, Color.White.copy(alpha = 0.35f))
+                drawCircle(Color.White, r * format.label, center, style = Stroke(r * format.label * 0.03f))
+            }
         }
         // The reflection on top: it doesn't spin with the record, it faces the light.
         Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = sheenAngle() }) {
