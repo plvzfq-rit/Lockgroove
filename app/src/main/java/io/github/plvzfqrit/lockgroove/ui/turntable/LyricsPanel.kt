@@ -53,6 +53,7 @@ fun LyricsPanel(
     color: Color,
     onShow: () -> Unit,
     onHide: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     /** Show Chinese lines in simplified characters. */
     simplified: Boolean = false,
@@ -73,7 +74,18 @@ fun LyricsPanel(
         Column(Modifier.fillMaxWidth().padding(end = 36.dp)) {
             when (state) {
                 LyricsState.Looking -> Hint("Looking for lyrics…", color)
-                LyricsState.None -> Hint("No lyrics for this song", color)
+                LyricsState.None -> {
+                    Hint("No lyrics for this song", color)
+                    Box(
+                        Modifier
+                            .padding(top = 6.dp)
+                            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(50))
+                            .clickable(role = Role.Button, onClickLabel = "Look for the lyrics again", onClick = onRetry)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Text("Retry", color = color.copy(alpha = 0.75f), fontSize = 13.sp)
+                    }
+                }
                 // One lyric at a time, with its Latin-letter reading under it when it is in another script.
                 is LyricsState.Found -> Crossfade(targetState = index, animationSpec = tween(250), label = "lyric") { i ->
                     val line = remember(i, simplified) {
@@ -83,8 +95,8 @@ fun LyricsPanel(
                     }
                     val reading = remember(line) { line?.text?.let(Romanizer::romanize) }
                     Column {
-                        Line(line, color, 17, FontWeight.SemiBold)
-                        if (reading != null) Line(LyricLine(0, reading), color.copy(alpha = 0.6f), 13, FontWeight.Normal)
+                        Line(line, color, 16, FontWeight.SemiBold, maxLines = 3)
+                        if (reading != null) Line(LyricLine(0, reading), color.copy(alpha = 0.6f), 12, FontWeight.Normal, maxLines = 2)
                     }
                 }
             }
@@ -108,7 +120,7 @@ private fun Hint(text: String, color: Color) {
 
 /** One line of lyrics. A pause in the singing (an empty line) shows as a note. */
 @Composable
-private fun Line(line: LyricLine?, color: Color, size: Int, weight: FontWeight) {
+private fun Line(line: LyricLine?, color: Color, size: Int, weight: FontWeight, maxLines: Int) {
     Text(
         text = when {
             line == null -> " "                                 // keeps the three rows from jumping about
@@ -118,7 +130,7 @@ private fun Line(line: LyricLine?, color: Color, size: Int, weight: FontWeight) 
         color = color,
         fontSize = size.sp,
         fontWeight = weight,
-        maxLines = 2,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(vertical = 2.dp),
     )

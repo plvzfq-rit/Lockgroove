@@ -1,8 +1,10 @@
 package io.github.plvzfqrit.lockgroove.lyrics
 
+import android.util.Log
 import io.github.plvzfqrit.lockgroove.core.lyrics.LrcParser
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricLine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -15,7 +17,11 @@ import kotlin.math.abs
 
 /**
  * Synced lyrics from lrclib.net, a free community service. It asks for one request at a time
- * (so a lock), so this keeps a small cache and never asks twice for the same song.
+ * (so a lock), is sometimes too busy to answer (so a few patient retries), and it is never asked
+ * twice for the same song (a small cache).
+ *
+ * It uses the search endpoint, not the exact one: the exact one was often "busy" when tried, and
+ * it misses titles that differ by a look-alike character (Spotify's "-" against a "‐").
  */
 class LrcLibSource : LyricsSource {
     override val serviceName = "lrclib.net"
@@ -25,73 +31,96 @@ class LrcLibSource : LyricsSource {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<LyricLine>>) = size > CACHE_SIZE
     }
 
-    override suspend fun find(title: String, artist: String?, durationMs: Long): List<LyricLine>? {
+    private sealed interface Outcome {
+        data object Busy : Outcome
+        data object Failed : Outcome
+        data class Done(val lines: List<LyricLine>) : Outcome
+    }
+
+    override suspend fun find(title: String, artist: String?, durationMs: Long, fresh: Boolean): List<LyricLine>? {
         val key = "$title|$artist|${durationMs / 1000}"
-        synchronized(cache) { cache[key] }?.let { return it }
+        if (!fresh) synchronized(cache) { cache[key] }?.let { return it }
         return lock.withLock {
-            synchronized(cache) { cache[key] }?.let { return@withLock it }       // fetched while we waited
-            val found = withContext(Dispatchers.IO) { fetch(title, artist, durationMs) }
-            if (found != null) synchronized(cache) { cache[key] = found }          // a failed lookup is not remembered
+            if (!fresh) synchronized(cache) { cache[key] }?.let { return@withLock it }   // fetched while we waited
+            var found: List<LyricLine>? = null
+            for (attempt in 0..RETRIES) {
+                val outcome = withContext(Dispatchers.IO) { fetch(title, artist, durationMs) }
+                Log.d(TAG, "\"$title\" by $artist (${durationMs / 1000} s), attempt ${attempt + 1}: $outcome")
+                when (outcome) {
+                    is Outcome.Done -> { found = outcome.lines; break }
+                    Outcome.Failed -> break
+                    Outcome.Busy -> delay(RETRY_DELAY_MS * (attempt + 1))              // the service is busy: wait, then ask again
+                }
+            }
+            if (found != null) synchronized(cache) { cache[key] = found }              // a failed lookup is not remembered
             found
         }
     }
 
-    private fun fetch(title: String, artist: String?, durationMs: Long): List<LyricLine>? = try {
+    private fun fetch(title: String, artist: String?, durationMs: Long): Outcome = try {
         // Players join several artists with commas; the first one is the one the service knows.
         val lead = artist?.substringBefore(", ")?.takeIf { it.isNotBlank() }
         val seconds = durationMs / 1000
-        val exact = request("get", title, lead, seconds)
-        when {
-            exact == null -> null
-            exact.first == 200 -> synced(JSONObject(exact.second))
-            exact.first == 404 -> searchInstead(title, lead, seconds)
-            else -> null
-        }
+        search(listOf("track_name" to title) + listOfNotNull(lead?.let { "artist_name" to it }), seconds)
+            .let { first ->
+                // Nothing under that exact title and artist: try the service's looser free-text search.
+                if (first is Outcome.Done && first.lines.isEmpty() && lead != null) {
+                    search(listOf("q" to "$lead $title"), seconds)
+                } else first
+            }
     } catch (e: Exception) {
-        null
+        Log.d(TAG, "lookup failed: $e")
+        Outcome.Failed
     }
 
-    /** No exact match: take the closest-length result that has synced lyrics. */
-    private fun searchInstead(title: String, artist: String?, seconds: Long): List<LyricLine>? {
-        val reply = request("search", title, artist, 0) ?: return null
-        if (reply.first != 200) return null
-        val results = JSONArray(reply.second)
-        var best: JSONObject? = null
-        for (i in 0 until results.length()) {
-            val item = results.getJSONObject(i)
-            if (item.isNull("syncedLyrics")) continue
-            val gap = abs(item.optDouble("duration", -1.0) - seconds)
-            if (seconds > 0 && gap > MAX_LENGTH_GAP_S) continue                        // a live version, a cover...
-            if (best == null || gap < abs(best.optDouble("duration", -1.0) - seconds)) best = item
-        }
-        return best?.let(::synced) ?: emptyList()
-    }
-
-    private fun synced(item: JSONObject): List<LyricLine> =
-        if (item.isNull("syncedLyrics")) emptyList() else LrcParser.parse(item.getString("syncedLyrics"))
-
-    /** One request: its status code and body, or null if it can't be made. */
-    private fun request(path: String, title: String, artist: String?, seconds: Long): Pair<Int, String>? {
-        val query = buildString {
-            append("track_name=").append(URLEncoder.encode(title, "UTF-8"))
-            if (artist != null) append("&artist_name=").append(URLEncoder.encode(artist, "UTF-8"))
-            if (path == "get" && seconds > 0) append("&duration=").append(seconds)
-        }
-        val connection = URL("https://lrclib.net/api/$path?$query").openConnection() as HttpURLConnection
-        return try {
+    /** Ask the search endpoint, and take the result closest in length that has synced lyrics. */
+    private fun search(params: List<Pair<String, String>>, seconds: Long): Outcome {
+        val query = params.joinToString("&") { (name, value) -> "$name=${URLEncoder.encode(value, "UTF-8")}" }
+        val connection = URL("https://lrclib.net/api/search?$query").openConnection() as HttpURLConnection
+        try {
             connection.connectTimeout = 5_000
             connection.readTimeout = 8_000
             connection.setRequestProperty("User-Agent", "Lockgroove (https://github.com/plvzfq-rit/Lockgroove)")
-            val code = connection.responseCode
-            val body = if (code == 200) connection.inputStream.bufferedReader().use { it.readText() } else ""
-            code to body
+            return when (val code = connection.responseCode) {
+                200 -> {
+                    val results = JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
+                    Outcome.Done(best(results, seconds)?.let(::synced) ?: emptyList())
+                }
+                429, 503 -> Outcome.Busy
+                else -> {
+                    Log.d(TAG, "unexpected answer: HTTP $code")
+                    Outcome.Failed
+                }
+            }
         } finally {
             connection.disconnect()
         }
     }
 
+    /** The synced result whose length is closest to the song's (a live version or a cover is rejected). */
+    private fun best(results: JSONArray, seconds: Long): JSONObject? {
+        var best: JSONObject? = null
+        var bestGap = Double.MAX_VALUE
+        for (i in 0 until results.length()) {
+            val item = results.getJSONObject(i)
+            if (item.isNull("syncedLyrics")) continue
+            val gap = if (seconds > 0) abs(item.optDouble("duration", -1.0) - seconds) else 0.0
+            if (seconds > 0 && gap > MAX_LENGTH_GAP_S) continue
+            if (gap < bestGap) {
+                best = item
+                bestGap = gap
+            }
+        }
+        return best
+    }
+
+    private fun synced(item: JSONObject): List<LyricLine> = LrcParser.parse(item.getString("syncedLyrics"))
+
     private companion object {
+        const val TAG = "LrcLib"
         const val CACHE_SIZE = 40
+        const val RETRIES = 3
+        const val RETRY_DELAY_MS = 1_500L
         /** A result this many seconds longer or shorter than the song is a different recording. */
         const val MAX_LENGTH_GAP_S = 3.0
     }

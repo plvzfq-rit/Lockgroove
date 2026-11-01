@@ -383,12 +383,17 @@ fun TurntableScreen(
         // Lyrics (the "withLyrics" build only): a landscape feature, off until the listener allows it.
         var askLyrics by remember { mutableStateOf(false) }
         val lyricsOn = landscape && LyricsFeature.available && settings.lyrics
-        val lyricsState by produceState<LyricsState>(LyricsState.Looking, ui.title, ui.artist, ui.durationMs, ui.player, lyricsOn) {
+        // Retry: ask again for this song right away, skipping any answer that was kept.
+        val lyricsSong = "${ui.title}|${ui.artist}|${ui.durationMs}"
+        var retriedSong by remember { mutableStateOf("") }
+        var retryCount by remember { mutableIntStateOf(0) }
+        val lyricsState by produceState<LyricsState>(LyricsState.Looking, lyricsSong, ui.player, lyricsOn, retryCount) {
             value = LyricsState.Looking
             val source = LyricsFeature.source()
             if (!lyricsOn || source == null || ui.player == null) return@produceState
-            delay(800)                                              // skipping through songs asks for nothing
-            val found = source.find(ui.title, ui.artist, ui.durationMs)
+            val retrying = retriedSong == lyricsSong
+            if (!retrying) delay(800)                               // skipping through songs asks for nothing
+            val found = source.find(ui.title, ui.artist, ui.durationMs, fresh = retrying)
             value = if (found.isNullOrEmpty()) LyricsState.None else LyricsState.Found(found)
         }
         var lyricsIndex by remember { mutableIntStateOf(-1) }
@@ -723,6 +728,7 @@ fun TurntableScreen(
                         color = litTextColor(deck.contentColor, RoomLight(night = nightNow)),
                         onShow = { askLyrics = true },
                         onHide = { vm.updateSettings { it.copy(lyrics = false) } },
+                        onRetry = { retriedSong = lyricsSong; retryCount++ },
                         simplified = settings.simplifiedChinese,
                         modifier = Modifier.weight(1f).padding(top = 12.dp),
                     )

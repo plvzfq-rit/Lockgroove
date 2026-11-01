@@ -9,8 +9,14 @@ import io.github.plvzfqrit.lockgroove.core.lyrics.LyricScripts
  * Call it from one thread (the screen's): the transliterator isn't thread-safe.
  */
 object Romanizer {
-    private val transliterator: Transliterator? by lazy {
+    /** Plain letters, no accents: right for Korean, Arabic, Cyrillic... */
+    private val plain: Transliterator? by lazy {
         runCatching { Transliterator.getInstance("Any-Latin; Latin-ASCII") }.getOrNull()
+    }
+
+    /** Keeps the accents, so Chinese comes out as pinyin with its tone marks (nǐ hǎo). NFC joins each mark to its letter. */
+    private val toned: Transliterator? by lazy {
+        runCatching { Transliterator.getInstance("Any-Latin; NFC") }.getOrNull()
     }
 
     private val simplifier: Transliterator? by lazy {
@@ -24,6 +30,7 @@ object Romanizer {
     /** The line in Latin letters, or null when it already is, or can't be read reliably. */
     fun romanize(text: String): String? {
         if (!LyricScripts.needsRomanization(text) || LyricScripts.isMixedJapanese(text)) return null
+        val transliterator = if (LyricScripts.isChinese(text)) toned else plain
         val out = runCatching { transliterator?.transliterate(text) }.getOrNull()?.trim()
         return out?.takeIf { it.isNotEmpty() && it != text }
     }
