@@ -157,6 +157,87 @@ fun FrontPanel(
     }
 }
 
+/**
+ * Landscape: the same five keys, in one row beside the title, on the [Ribbon]. They spread
+ * to fill whatever width the row is given.
+ */
+@Composable
+fun ControlKeys(
+    playing: Boolean,
+    repeatOne: Boolean,
+    night: () -> Float,
+    onStartStop: () -> Unit,
+    onCue: () -> Unit,
+    onRepeat: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Key(KeyIcon.Previous, "Previous song", lit = false, night, onPrevious, onHoldRepeat = onPrevious, compact = true)
+        Key(KeyIcon.StartStop, if (playing) "Stop" else "Start", lit = playing, night, onStartStop, compact = true)
+        Key(KeyIcon.Cue, "Cue: lift or lower the needle", lit = false, night, onCue, compact = true)
+        Key(KeyIcon.RepeatOne, "Repeat one", lit = repeatOne, night, onRepeat,
+            state = if (repeatOne) "On" else "Off", compact = true)
+        Key(KeyIcon.Next, "Next song", lit = false, night, onNext, onHoldRepeat = onNext, compact = true)
+    }
+}
+
+/** Height of the ribbon above the navigation bar (lip + face). */
+val RIBBON_HEIGHT = 8.dp + 44.dp
+
+/**
+ * Landscape: the deck's front edge as a thin ribbed ribbon along the bottom, under the record.
+ * The same materials as [FrontPanel] (each background has its own), without the keys: they
+ * are drawn on top of it by the screen.
+ * @param lampCenter where the lamp's pool is centred, in this ribbon's coordinates (px)
+ */
+@Composable
+fun Ribbon(
+    style: BackdropStyle,
+    albumPalette: VinylPalette?,
+    paint: Color?,
+    light: () -> RoomLight,
+    lampCenter: Offset,
+    lampRadius: Float,
+    modifier: Modifier = Modifier,
+) {
+    val (targetA, targetB) = albumPair(albumPalette)
+    val albumA by animateColorAsState(targetA, tween(900, easing = FastOutSlowInEasing), label = "ribbonA")
+    val albumB by animateColorAsState(targetB, tween(900, easing = FastOutSlowInEasing), label = "ribbonB")
+    val album = albumA to albumB
+    Column(modifier.fillMaxWidth()) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .drawWithCache {
+                    val lip = paint?.let(::paintedLip) ?: lipBrush(style, album)
+                    onDrawBehind {
+                        drawRect(lip)
+                        drawLine(Color.Black.copy(alpha = 0.25f), Offset(0f, size.height - 0.5f),
+                            Offset(size.width, size.height - 0.5f), 1f)
+                        drawLampLight(light(), lampCenter, lampRadius, glint = 0f)
+                    }
+                }
+        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .drawWithCache {
+                    val texture = faceTexture(style, album, paint, size, 4.dp.toPx())
+                    val faceLamp = lampCenter - Offset(0f, 8.dp.toPx())          // the face sits under the lip
+                    onDrawBehind {
+                        texture()
+                        drawLampLight(light(), faceLamp, lampRadius, glint = 0f)
+                    }
+                }
+                .navigationBarsPadding()
+                .height(44.dp)
+        )
+    }
+}
+
 // ------------------------------------------------------------------ materials
 
 private fun lipBrush(style: BackdropStyle, album: Pair<Color, Color>): Brush = when (style) {
@@ -277,6 +358,8 @@ private fun Key(
     /** If set, holding the key repeats this, speeding up. */
     onHoldRepeat: (() -> Unit)? = null,
     state: String? = null,
+    /** A narrower key (landscape): five of them fit in a row beside the title. */
+    compact: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -309,7 +392,7 @@ private fun Key(
     }
     Box(
         Modifier
-            .size(width = 54.dp, height = 46.dp)                   // generous touch area
+            .size(width = if (compact) 44.dp else 54.dp, height = 46.dp)   // generous touch area
             .semantics {
                 contentDescription = description
                 if (state != null) stateDescription = state
@@ -321,7 +404,7 @@ private fun Key(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(width = 44.dp, height = 33.dp)) {
+        Canvas(Modifier.size(width = if (compact) 36.dp else 44.dp, height = if (compact) 29.dp else 33.dp)) {
             val n = night()
             val travel = 3.dp.toPx() * press
             val h = size.height - 3.dp.toPx()
@@ -383,7 +466,7 @@ private fun Key(
             // The symbol: printed cream by day, backlit warm white at night, amber when on;
             // a press flares it toward white.
             val symbol = lerp(lerp(lerp(Ink, Backlight, n), Glow, glow), Color.White, 0.45f * press)
-            drawKeyIcon(icon, symbol, c, 21.dp.toPx())
+            drawKeyIcon(icon, symbol, c, (if (compact) 17.dp else 21.dp).toPx())
         }
     }
 }
