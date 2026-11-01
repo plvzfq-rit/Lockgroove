@@ -59,6 +59,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import io.github.plvzfqrit.lockgroove.ui.common.rememberBreath
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
@@ -248,6 +249,7 @@ fun TurntableScreen(
             showBuffering = true
         } else showBuffering = false
     }
+    val titleBreath by rememberBreath(showBuffering && settings.pulseTitle)
 
     // ---------------- Surface noise ----------------
     // Crackle while the needle is on a sounding record, the locked-groove thump in the
@@ -456,7 +458,7 @@ fun TurntableScreen(
                         size = disc.size,
                         title = disc.title,
                         artist = disc.artist,
-                        buffering = showBuffering,
+                        buffering = showBuffering && settings.pulseLabel,
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
@@ -631,7 +633,7 @@ fun TurntableScreen(
                 // when it stops or the stats cover it. Light motion: a few passes per song.
                 val passes = pace.titlePasses
                 Crossfade(targetState = ui.title to ui.artist, animationSpec = tween(400), label = "title") { (t, a) ->
-                    Column(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().graphicsLayer { alpha = 1f - 0.5f * titleBreath }) {
                         val text = litTextColor(deck.contentColor, RoomLight(night = nightNow))
                         MarqueeText(
                             t, text, MaterialTheme.typography.headlineMedium,

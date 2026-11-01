@@ -2,12 +2,7 @@ package io.github.plvzfqrit.lockgroove.ui.drawing
 
 import io.github.plvzfqrit.lockgroove.core.model.RecordSize
 import android.graphics.Bitmap
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import io.github.plvzfqrit.lockgroove.ui.common.rememberBreath
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -176,13 +171,8 @@ fun VinylRecord(
         // Stuck buffering: a faint glow breathes on the label. It only exists while needed, and
         // its fade runs in the layer, so nothing is redrawn or recomposed per frame.
         if (buffering) {
-            val pulse by rememberInfiniteTransition(label = "buffering").animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                label = "pulse",
-            )
-            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = 0.05f + 0.30f * pulse }) {
+            val breath by rememberBreath(true)
+            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = 0.05f + 0.30f * breath }) {
                 val r = this.size.minDimension / 2f * format.radiusOfPlatter
                 val label = Path().apply {
                     fillType = PathFillType.EvenOdd

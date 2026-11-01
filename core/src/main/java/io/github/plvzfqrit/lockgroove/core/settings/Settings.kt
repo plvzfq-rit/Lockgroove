@@ -46,6 +46,10 @@ data class Settings(
     /** How fast the platter turns, degrees a second ([Scales.spin]; 30 = a turn every 12 s). */
     val spin: Float = 30f,
     val grooveGlints: Boolean = true,
+    /** While a player is stuck buffering, the record's label breathes. */
+    val pulseLabel: Boolean = true,
+    /** While a player is stuck buffering, the song title and artist breathe. */
+    val pulseTitle: Boolean = true,
     /** How smoothly (and how often) the record is redrawn. */
     val motion: MotionQuality = MotionQuality.Balanced,
     val keepScreenOn: Boolean = true,

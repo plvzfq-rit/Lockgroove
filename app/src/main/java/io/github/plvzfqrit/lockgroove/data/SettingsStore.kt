@@ -28,6 +28,8 @@ class SettingsStore(context: Context) {
             // Before the sliders these were fixed choices, saved by name: read those once.
             spin = p[SPIN_SPEED] ?: p[OLD_SPIN]?.let { OLD_SPINS[it] } ?: d.spin,
             grooveGlints = p[GLINTS] ?: d.grooveGlints,
+            pulseLabel = p[PULSE_LABEL] ?: d.pulseLabel,
+            pulseTitle = p[PULSE_TITLE] ?: d.pulseTitle,
             motion = enumOr(p[MOTION], d.motion),
             keepScreenOn = p[SCREEN_ON] ?: d.keepScreenOn,
             dimWhenIdle = p[DIM_WHEN_IDLE] ?: d.dimWhenIdle,
@@ -62,6 +64,8 @@ class SettingsStore(context: Context) {
         store.edit { p ->
             p[SPIN_SPEED] = s.spin
             p[GLINTS] = s.grooveGlints
+            p[PULSE_LABEL] = s.pulseLabel
+            p[PULSE_TITLE] = s.pulseTitle
             p[MOTION] = s.motion.name
             p[SCREEN_ON] = s.keepScreenOn
             p[DIM_WHEN_IDLE] = s.dimWhenIdle
@@ -99,6 +103,8 @@ class SettingsStore(context: Context) {
         val PANEL_PAINT = intPreferencesKey("panel_paint")
         val SPIN_SPEED = floatPreferencesKey("spin_deg_per_sec")
         val GLINTS = booleanPreferencesKey("groove_glints")
+        val PULSE_LABEL = booleanPreferencesKey("pulse_label")
+        val PULSE_TITLE = booleanPreferencesKey("pulse_title")
         val MOTION = stringPreferencesKey("motion")
         val SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val DIM_WHEN_IDLE = booleanPreferencesKey("dim_when_idle")

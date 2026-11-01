@@ -195,6 +195,18 @@ fun SettingsSheet(
                     checked = settings.grooveGlints,
                     fg = fg, bg = bg,
                 ) { tick(); onSettings(settings.copy(grooveGlints = it)) }
+                ToggleRow(
+                    title = "Pulse the label when stuck",
+                    subtitle = "If the player is stuck loading a song, the record's label breathes",
+                    checked = settings.pulseLabel,
+                    fg = fg, bg = bg,
+                ) { tick(); onSettings(settings.copy(pulseLabel = it)) }
+                ToggleRow(
+                    title = "Pulse the title when stuck",
+                    subtitle = "...and so do the song title and artist",
+                    checked = settings.pulseTitle,
+                    fg = fg, bg = bg,
+                ) { tick(); onSettings(settings.copy(pulseTitle = it)) }
 
             } }
             item { Column(Modifier.fillMaxWidth()) {
