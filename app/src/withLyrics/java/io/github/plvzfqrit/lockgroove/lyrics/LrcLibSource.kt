@@ -2,6 +2,7 @@ package io.github.plvzfqrit.lockgroove.lyrics
 
 import android.util.Log
 import io.github.plvzfqrit.lockgroove.core.lyrics.LrcParser
+import io.github.plvzfqrit.lockgroove.core.lyrics.LyricMatch
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricLine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -13,7 +14,6 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import kotlin.math.abs
 
 /**
  * Synced lyrics from lrclib.net, a free community service. It asks for one request at a time
@@ -27,33 +27,42 @@ class LrcLibSource : LyricsSource {
     override val serviceName = "lrclib.net"
 
     private val lock = Mutex()
-    private val cache = object : LinkedHashMap<String, List<LyricLine>>(32, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<LyricLine>>) = size > CACHE_SIZE
+    private val cache = object : LinkedHashMap<String, LyricsResult>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, LyricsResult>) = size > CACHE_SIZE
     }
 
     private sealed interface Outcome {
         data object Busy : Outcome
         data object Failed : Outcome
-        data class Done(val lines: List<LyricLine>) : Outcome
+        data class Done(val result: LyricsResult) : Outcome
     }
 
-    override suspend fun find(title: String, artist: String?, durationMs: Long, fresh: Boolean): List<LyricLine>? {
+    override suspend fun find(title: String, artist: String?, durationMs: Long, fresh: Boolean): LyricsResult {
         val key = "$title|$artist|${durationMs / 1000}"
         if (!fresh) synchronized(cache) { cache[key] }?.let { return it }
         return lock.withLock {
             if (!fresh) synchronized(cache) { cache[key] }?.let { return@withLock it }   // fetched while we waited
-            var found: List<LyricLine>? = null
+            var found: LyricsResult? = null
             for (attempt in 0..RETRIES) {
                 val outcome = withContext(Dispatchers.IO) { fetch(title, artist, durationMs) }
-                Log.d(TAG, "\"$title\" by $artist (${durationMs / 1000} s), attempt ${attempt + 1}: $outcome")
+                // Only a summary: never write the lyrics themselves into the system log.
+                val summary = when (outcome) {
+                    is Outcome.Done -> when (val r = outcome.result) {
+                        is LyricsResult.Found -> "found ${r.lines.size} lines"
+                        else -> r.toString()
+                    }
+                    Outcome.Busy -> "the service is busy"
+                    Outcome.Failed -> "failed"
+                }
+                Log.d(TAG, "\"$title\" by $artist (${durationMs / 1000} s), attempt ${attempt + 1}: $summary")
                 when (outcome) {
-                    is Outcome.Done -> { found = outcome.lines; break }
+                    is Outcome.Done -> { found = outcome.result; break }
                     Outcome.Failed -> break
                     Outcome.Busy -> delay(RETRY_DELAY_MS * (attempt + 1))              // the service is busy: wait, then ask again
                 }
             }
             if (found != null) synchronized(cache) { cache[key] = found }              // a failed lookup is not remembered
-            found
+            found ?: LyricsResult.Unreachable
         }
     }
 
@@ -63,9 +72,11 @@ class LrcLibSource : LyricsSource {
         val seconds = durationMs / 1000
         search(listOf("track_name" to title) + listOfNotNull(lead?.let { "artist_name" to it }), seconds)
             .let { first ->
-                // Nothing under that exact title and artist: try the service's looser free-text search.
-                if (first is Outcome.Done && first.lines.isEmpty() && lead != null) {
-                    search(listOf("q" to "$lead $title"), seconds)
+                // Nothing usable under that exact title and artist: try the service's looser free-text search,
+                // and keep whichever answer is better.
+                if (first is Outcome.Done && first.result !is LyricsResult.Found && lead != null) {
+                    val second = search(listOf("q" to "$lead $title"), seconds)
+                    if (second is Outcome.Done && rank(second.result) > rank(first.result)) second else first
                 } else first
             }
     } catch (e: Exception) {
@@ -73,7 +84,14 @@ class LrcLibSource : LyricsSource {
         Outcome.Failed
     }
 
-    /** Ask the search endpoint, and take the result closest in length that has synced lyrics. */
+    private fun rank(result: LyricsResult) = when (result) {
+        is LyricsResult.Found -> 3
+        LyricsResult.NoFit -> 2
+        LyricsResult.NotFound -> 1
+        LyricsResult.Unreachable -> 0
+    }
+
+    /** Ask the search endpoint, and judge what comes back. */
     private fun search(params: List<Pair<String, String>>, seconds: Long): Outcome {
         val query = params.joinToString("&") { (name, value) -> "$name=${URLEncoder.encode(value, "UTF-8")}" }
         val connection = URL("https://lrclib.net/api/search?$query").openConnection() as HttpURLConnection
@@ -84,7 +102,7 @@ class LrcLibSource : LyricsSource {
             return when (val code = connection.responseCode) {
                 200 -> {
                     val results = JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
-                    Outcome.Done(best(results, seconds)?.let(::synced) ?: emptyList())
+                    Outcome.Done(judge(results, seconds))
                 }
                 429, 503 -> Outcome.Busy
                 else -> {
@@ -97,31 +115,24 @@ class LrcLibSource : LyricsSource {
         }
     }
 
-    /** The synced result whose length is closest to the song's (a live version or a cover is rejected). */
-    private fun best(results: JSONArray, seconds: Long): JSONObject? {
-        var best: JSONObject? = null
-        var bestGap = Double.MAX_VALUE
-        for (i in 0 until results.length()) {
+    /**
+     * What the results amount to: nothing with synced lyrics at all (NotFound), some that
+     * don't fit this recording (NoFit, see [LyricMatch]), or the lyrics that do (Found).
+     */
+    private fun judge(results: JSONArray, seconds: Long): LyricsResult {
+        val candidates = (0 until results.length()).mapNotNull { i ->
             val item = results.getJSONObject(i)
-            if (item.isNull("syncedLyrics")) continue
-            val gap = if (seconds > 0) abs(item.optDouble("duration", -1.0) - seconds) else 0.0
-            if (seconds > 0 && gap > MAX_LENGTH_GAP_S) continue
-            if (gap < bestGap) {
-                best = item
-                bestGap = gap
-            }
+            if (item.isNull("syncedLyrics")) null
+            else LyricMatch.Candidate(item.optDouble("duration", -1.0), LrcParser.parse(item.getString("syncedLyrics")))
         }
-        return best
+        if (candidates.isEmpty()) return LyricsResult.NotFound
+        return LyricMatch.pick(candidates, seconds)?.let { LyricsResult.Found(candidates[it].lines) } ?: LyricsResult.NoFit
     }
-
-    private fun synced(item: JSONObject): List<LyricLine> = LrcParser.parse(item.getString("syncedLyrics"))
 
     private companion object {
         const val TAG = "LrcLib"
         const val CACHE_SIZE = 40
         const val RETRIES = 3
         const val RETRY_DELAY_MS = 1_500L
-        /** A result this many seconds longer or shorter than the song is a different recording. */
-        const val MAX_LENGTH_GAP_S = 3.0
     }
 }

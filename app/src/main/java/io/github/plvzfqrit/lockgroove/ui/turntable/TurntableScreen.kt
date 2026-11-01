@@ -64,12 +64,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
-import io.github.plvzfqrit.lockgroove.core.lyrics.LyricLine
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricScripts
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricsTracker
 import io.github.plvzfqrit.lockgroove.lyrics.JapaneseReaders
 import io.github.plvzfqrit.lockgroove.lyrics.Romanizer
 import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsResult
 import kotlinx.coroutines.isActive
 import io.github.plvzfqrit.lockgroove.ui.common.rememberBreath
 import androidx.compose.runtime.snapshotFlow
@@ -386,32 +386,33 @@ fun TurntableScreen(
         val k = minOf(maxHeight / LANDSCAPE_REF_H, (maxWidth - navRight) / LANDSCAPE_REF_W)
         // Lyrics (the "withLyrics" build only): a landscape feature, off until the listener allows it.
         var askLyrics by remember { mutableStateOf(false) }
-        val lyricsOn = landscape && LyricsFeature.available && settings.lyrics
+        val lyricsOn = LyricsFeature.available && settings.lyrics
         // Retry: ask again for this song right away, skipping any answer that was kept.
         val lyricsSong = "${ui.title}|${ui.artist}|${ui.durationMs}"
         var retriedSong by remember { mutableStateOf("") }
         var retryCount by remember { mutableIntStateOf(0) }
-        // Step 1: the lyrics as fetched (null while still asking; empty when there are none).
-        val fetchedLyrics by produceState<List<LyricLine>?>(null, lyricsSong, ui.player, lyricsOn, retryCount) {
+        // Step 1: what the lookup came back with (null while still asking).
+        val fetchedLyrics by produceState<LyricsResult?>(null, lyricsSong, ui.player, lyricsOn, retryCount) {
             value = null
             val source = LyricsFeature.source()
             if (!lyricsOn || source == null || ui.player == null) return@produceState
             val retrying = retriedSong == lyricsSong
             if (!retrying) delay(800)                               // skipping through songs asks for nothing
-            value = source.find(ui.title, ui.artist, ui.durationMs, fresh = retrying).orEmpty()
+            value = source.find(ui.title, ui.artist, ui.durationMs, fresh = retrying)
         }
         // Step 2: the finished lines and their Latin-letter readings, worked out once per song in
         // the background (a dictionary lookup must never run while the screen is being drawn).
         val simplifiedChinese = settings.simplifiedChinese
         val lyricsState by produceState<LyricsState>(LyricsState.Looking, fetchedLyrics, simplifiedChinese) {
-            val fetched = fetchedLyrics
-            value = when {
-                fetched == null -> LyricsState.Looking
-                fetched.isEmpty() -> LyricsState.None
-                else -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            value = when (val fetched = fetchedLyrics) {
+                null -> LyricsState.Looking
+                LyricsResult.NotFound -> LyricsState.None
+                LyricsResult.NoFit -> LyricsState.NoFit
+                LyricsResult.Unreachable -> LyricsState.Unreachable
+                is LyricsResult.Found -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                     val shown = if (simplifiedChinese) {
-                        fetched.map { if (LyricScripts.isChinese(it.text)) it.copy(text = Romanizer.simplify(it.text)) else it }
-                    } else fetched
+                        fetched.lines.map { if (LyricScripts.isChinese(it.text)) it.copy(text = Romanizer.simplify(it.text)) else it }
+                    } else fetched.lines
                     LyricsState.Found(shown, shown.map { Romanizer.romanize(it.text) })
                 }
             }
@@ -743,8 +744,9 @@ fun TurntableScreen(
                         }
                     }
                 }
-                // Landscape, "withLyrics" build: the space between the artist and the ribbon.
-                if (landscape && LyricsFeature.available) {
+                // "withLyrics" build: the space under the artist (above the ribbon in landscape,
+                // above the front panel in portrait, where it is wide but short).
+                if (LyricsFeature.available) {
                     LyricsPanel(
                         on = lyricsOn,
                         state = lyricsState,
@@ -753,7 +755,8 @@ fun TurntableScreen(
                         onShow = { askLyrics = true },
                         onHide = { vm.updateSettings { it.copy(lyrics = false) } },
                         onRetry = { retriedSong = lyricsSong; retryCount++ },
-                        modifier = Modifier.weight(1f).padding(top = 12.dp),
+                        modifier = Modifier.weight(1f).padding(top = if (landscape) 12.dp else 8.dp),
+                        compact = !landscape,
                     )
                 }
             }

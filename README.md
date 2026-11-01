@@ -120,8 +120,8 @@ There are two builds of the same app:
 
 - **standard**: the app described above. It has no internet permission at all.
 - **withLyrics**: the same app, installed beside it as a separate app (`.lyrics`), plus the
-  internet permission and one extra feature. In landscape, a **Show lyrics** button appears
-  under the artist's name. Nothing is looked up until you tap it and allow it; after that
+  internet permission and one extra feature. A **Show lyrics** button appears
+  under the artist's name, in portrait and in landscape. Nothing is looked up until you tap it and allow it; after that
   the song's title, artist and length are sent to [lrclib.net](https://lrclib.net) to fetch
   synced lyrics. The ✕ turns it off again. Build it with `./gradlew :app:installWithLyricsRelease`.
   Songs in Chinese, Korean, Japanese, Arabic and other scripts also get a reading in Latin

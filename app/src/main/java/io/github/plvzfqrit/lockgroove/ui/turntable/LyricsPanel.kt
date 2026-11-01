@@ -5,19 +5,25 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,18 +36,26 @@ sealed interface LyricsState {
     /** Still asking. */
     data object Looking : LyricsState
 
-    /** No synced lyrics, or the lookup failed (offline, say). */
+    /** The lyrics database has nothing under this song's name. */
     data object None : LyricsState
+
+    /** It has lyrics under that name, but none fit this recording. */
+    data object NoFit : LyricsState
+
+    /** The question couldn't be asked: offline, or the service was too busy. */
+    data object Unreachable : LyricsState
 
     /** [readings] has one entry per line: its Latin-letter reading, or null when it needs none. */
     data class Found(val lines: List<LyricLine>, val readings: List<String?>) : LyricsState
 }
 
 /**
- * The lyrics area of the landscape layout. Off: a "Show lyrics" button (tapping it asks the
- * listener first). On: the line being sung (with its Latin-letter reading under it when it is in
- * another script), and a ✕ that turns it off again.
+ * The lyrics area. Off: a "Show lyrics" button (tapping it asks the listener first). On: the line
+ * being sung (with its Latin-letter reading under it when it is in another script), and a ✕ that
+ * turns it off again.
  * @param index the line being sung now (-1 before the first)
+ * @param compact the gap in portrait: wide but short, so fewer rows (it counts how many fit, and
+ *        draws nothing when there is no room at all)
  */
 @Composable
 fun LyricsPanel(
@@ -53,8 +67,13 @@ fun LyricsPanel(
     onHide: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
-    Box(modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        if (compact && maxHeight < MIN_COMPACT_HEIGHT) return@BoxWithConstraints   // no room to be useful
+        val lyricRows = if (!compact) 3 else if (maxHeight >= ROOMY_COMPACT_HEIGHT) 2 else 1
+        val readingRows = if (compact) 1 else 2
+        val lyricSize = if (compact) 15 else 16
         if (!on) {
             Box(
                 Modifier
@@ -65,30 +84,21 @@ fun LyricsPanel(
             ) {
                 Text("Show lyrics", color = color.copy(alpha = 0.8f), fontSize = 14.sp)
             }
-            return@Box
+            return@BoxWithConstraints
         }
         Column(Modifier.fillMaxWidth().padding(end = 36.dp)) {
             when (state) {
                 LyricsState.Looking -> Hint("Looking for lyrics…", color)
-                LyricsState.None -> {
-                    Hint("No lyrics for this song", color)
-                    Box(
-                        Modifier
-                            .padding(top = 6.dp)
-                            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(50))
-                            .clickable(role = Role.Button, onClickLabel = "Look for the lyrics again", onClick = onRetry)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    ) {
-                        Text("Retry", color = color.copy(alpha = 0.75f), fontSize = 13.sp)
-                    }
-                }
+                LyricsState.None -> Notice(Icons.Filled.MusicOff, "No lyrics for this song", color, onRetry, compact)
+                LyricsState.NoFit -> Notice(Icons.Filled.CompareArrows, "Lyrics don't fit this recording", color, onRetry, compact)
+                LyricsState.Unreachable -> Notice(Icons.Filled.CloudOff, "Couldn't reach the lyrics service", color, onRetry, compact)
                 // One lyric at a time, with its Latin-letter reading under it when it is in another script.
                 is LyricsState.Found -> Crossfade(targetState = index, animationSpec = tween(250), label = "lyric") { i ->
                     val line = state.lines.getOrNull(i)
                     val reading = state.readings.getOrNull(i)
                     Column {
-                        Line(line, color, 16, FontWeight.SemiBold, maxLines = 3)
-                        if (reading != null) Line(LyricLine(0, reading), color.copy(alpha = 0.6f), 12, FontWeight.Normal, maxLines = 2)
+                        Line(line, color, lyricSize, FontWeight.SemiBold, maxLines = lyricRows)
+                        if (reading != null) Line(LyricLine(0, reading), color.copy(alpha = 0.6f), 12, FontWeight.Normal, maxLines = readingRows)
                     }
                 }
             }
@@ -105,10 +115,50 @@ fun LyricsPanel(
     }
 }
 
+/**
+ * An explanation of why there are no lyrics, with its own icon, and a Retry button. Compact:
+ * the message and the button share one row (the stacked layout needs about 56 dp).
+ */
+@Composable
+private fun Notice(icon: ImageVector, message: String, color: Color, onRetry: () -> Unit, compact: Boolean) {
+    if (compact) {
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            Text(
+                message, color = color.copy(alpha = 0.7f), fontSize = 13.sp, maxLines = 2,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            )
+            RetryPill(color, onRetry)
+        }
+        return
+    }
+    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+        Text(message, color = color.copy(alpha = 0.7f), fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
+    }
+    RetryPill(color, onRetry, Modifier.padding(top = 8.dp))
+}
+
+@Composable
+private fun RetryPill(color: Color, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(50))
+            .clickable(role = Role.Button, onClickLabel = "Look for the lyrics again", onClick = onRetry)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text("Retry", color = color.copy(alpha = 0.75f), fontSize = 13.sp)
+    }
+}
+
 @Composable
 private fun Hint(text: String, color: Color) {
     Text(text, color = color.copy(alpha = 0.55f), fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
 }
+
+/** Below this height the portrait gap draws nothing; from [ROOMY_COMPACT_HEIGHT] it can show two lyric rows. */
+private val MIN_COMPACT_HEIGHT = 40.dp
+private val ROOMY_COMPACT_HEIGHT = 78.dp
 
 /** One line of lyrics. A pause in the singing (an empty line) shows as a note. */
 @Composable
