@@ -2,7 +2,6 @@ package io.github.plvzfqrit.lockgroove.core.turntable
 
 import io.github.plvzfqrit.lockgroove.core.FakePlayer
 import io.github.plvzfqrit.lockgroove.core.model.SongKey
-import io.github.plvzfqrit.lockgroove.core.settings.SkipStyle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -11,10 +10,6 @@ import kotlin.test.assertTrue
 class SlowPlayerTest {
     private val h = ControllerHarness()
     private val c = h.controller
-
-    init {
-        c.updateSettings { it.copy(skipStyle = SkipStyle.Ritual) }      // this is about the ritual's choreography
-    }
 
     private fun key(title: String) = SongKey.of(title, "Artist")
 

@@ -41,19 +41,11 @@ enum class MotionQuality(val label: String) {
     Smooth("Smooth"),               // every frame at the screen's full rate (90/120 Hz)
 }
 
-/** What the skip keys (and a swipe on the record) do. */
-enum class SkipStyle(val label: String) {
-    Ritual("Ritual"),               // lift the arm, pause, swap the record, drop the needle
-    Snap("Snap"),                   // the music flows on and the deck snaps to the new song
-}
-
 /** Everything adjustable, plus what the app has learned. Plain data: saved by the app. */
 data class Settings(
     /** How fast the platter turns, degrees a second ([Scales.spin]; 30 = a turn every 12 s). */
     val spin: Float = 30f,
     val grooveGlints: Boolean = true,
-    /** How skipping looks and sounds: the full ritual, or an instant snap with no pause. */
-    val skipStyle: SkipStyle = SkipStyle.Snap,
     /** While a player is stuck buffering, the record's label breathes. */
     val pulseLabel: Boolean = true,
     /** While a player is stuck buffering, the song title and artist breathe. */

@@ -2,7 +2,6 @@ package io.github.plvzfqrit.lockgroove.core.turntable
 
 import io.github.plvzfqrit.lockgroove.core.model.RecordSize
 import io.github.plvzfqrit.lockgroove.core.playback.PlayerCommand
-import io.github.plvzfqrit.lockgroove.core.settings.SkipStyle
 import io.github.plvzfqrit.lockgroove.core.snapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -89,7 +88,6 @@ class TurntableControllerTest {
     }
 
     @Test fun `flicking lifts the needle once, skips silently, and plays the song you land on`() {
-        c.updateSettings { it.copy(skipStyle = SkipStyle.Ritual) }
         c.onSnapshot(playing("Song A"))
         c.onStart()
         h.run(500)
