@@ -1,5 +1,7 @@
 package io.github.plvzfqrit.lockgroove.core.turntable
 
+import io.github.plvzfqrit.lockgroove.core.FakePlayer
+import io.github.plvzfqrit.lockgroove.core.model.SongKey
 import io.github.plvzfqrit.lockgroove.core.playback.PlayerCommand
 import io.github.plvzfqrit.lockgroove.core.settings.SkipStyle
 import io.github.plvzfqrit.lockgroove.core.snapshot
@@ -60,6 +62,7 @@ class SnapSkipTest {
     }
 
     @Test fun `the ritual style still queues the skip instead of sending it at once`() {
+        c.updateSettings { it.copy(skipStyle = SkipStyle.Ritual) }
         c.onSnapshot(song())
         c.onStart()
         h.run(500)
@@ -75,5 +78,21 @@ class SnapSkipTest {
         c.onSnapshot(song("Song B", positionMs = 0))
         h.run(500)
         assertEquals(emptyMap(), c.settings.value.learnedCrossfades)
+    }
+
+    @Test fun `with a slow player the deck snaps once to the new song, and the music is never touched`() {
+        val p = FakePlayer(h.clock, listOf("A", "B", "C"), index = 1, latencyMs = 900, startAtMs = 60_000)
+        h.player = p
+        c.onSnapshot(p.snapshot())
+        c.onStart()
+        h.run(500)
+        h.moves.clear()
+        h.commands.clear()
+        c.onIntent(UserIntent.Flick(+1))
+        h.run(4_000)
+        assertEquals("C", p.title)
+        assertEquals(SongKey.of("C", "Artist"), h.deck.disc?.key)
+        assertEquals(SongKey.of("C", "Artist"), h.deck.needleOn)
+        assertEquals(listOf<PlayerCommand>(PlayerCommand.Next), h.commands)
     }
 }

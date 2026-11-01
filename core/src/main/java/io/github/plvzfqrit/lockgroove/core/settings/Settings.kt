@@ -53,7 +53,7 @@ data class Settings(
     val spin: Float = 30f,
     val grooveGlints: Boolean = true,
     /** How skipping looks and sounds: the full ritual, or an instant snap with no pause. */
-    val skipStyle: SkipStyle = SkipStyle.Ritual,
+    val skipStyle: SkipStyle = SkipStyle.Snap,
     /** While a player is stuck buffering, the record's label breathes. */
     val pulseLabel: Boolean = true,
     /** While a player is stuck buffering, the song title and artist breathe. */
