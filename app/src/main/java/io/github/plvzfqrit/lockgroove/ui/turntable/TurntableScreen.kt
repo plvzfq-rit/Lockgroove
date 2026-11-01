@@ -23,7 +23,6 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +37,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -366,17 +364,15 @@ fun TurntableScreen(
     ) {
         val screenWidth = maxWidth
         val screenHeight = maxHeight
-        // Portrait: a platter wider than the screen, bleeding off the left edge, high up.
-        // Landscape: sized from the screen's height, with a column for the title and keys on its right.
-        val landscape = maxWidth > maxHeight
-        val platterSize = if (landscape) maxHeight * LANDSCAPE_PLATTER else maxWidth * 1.213f
+        // A platter wider than the screen, bleeding off the left edge, high up.
+        val platterSize = maxWidth * 1.213f
         val platterRadius = platterSize / 2
-        val platterTop = if (landscape) maxHeight * LANDSCAPE_SPINDLE_Y - platterRadius else (maxHeight - platterSize) / 2 * (1 - 0.65f)
-        val platterLeft = if (landscape) -platterSize * LANDSCAPE_BLEED else (maxWidth - platterSize) / 2 * (1 + 2.13f)
+        val platterTop = (maxHeight - platterSize) / 2 * (1 - 0.65f)
+        val platterLeft = (maxWidth - platterSize) / 2 * (1 + 2.13f)
         val spindleX = platterLeft + platterRadius
         val spindleY = platterTop + platterRadius
         val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val panelHeight = if (landscape) 0.dp else FRONT_PANEL_HEIGHT + navInset
+        val panelHeight = FRONT_PANEL_HEIGHT + navInset
         val panelTop = with(screenDensity) { (screenHeight - panelHeight).toPx() }
         val armColors = deck.tonearm
 
@@ -398,13 +394,7 @@ fun TurntableScreen(
         val unit = platterRadius / TurntableGeometry.PLATTER_RADIUS          // dp per tonearm unit
         val pivotX = spindleX + unit * TurntableGeometry.PIVOT_FROM_SPINDLE.x
         val settingsCenterX = minOf(pivotX + unit * 40f, screenWidth - 12.dp - 27.dp)
-        // Landscape: the navigation bar sits on the right edge and the status bar on top.
-        val navRight = WindowInsets.navigationBars.asPaddingValues().calculateRightPadding(LayoutDirection.Ltr)
-        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val knobAt = if (landscape) Modifier.offset(x = screenWidth - navRight - 12.dp - 54.dp, y = statusTop + 8.dp)
-        else Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp)
-        // Landscape: the title and keys start clear of the arm (its base plate reaches about 45 units past the pivot).
-        val rightStart = pivotX + unit * 45f + 24.dp
+        val knobAt = Modifier.offset(x = settingsCenterX - 27.dp, y = platterTop + platterSize - 48.dp)
         val knobPress = remember { MutableInteractionSource() }
 
         // The lamp hangs over the record's resting place.
@@ -633,18 +623,10 @@ fun TurntableScreen(
 
             // Title and artist sit on the top plate, between the record and the front edge.
             Column(
-                if (landscape) {
-                    Modifier
-                        .fillMaxSize()
-                        .padding(start = rightStart, end = navRight + 24.dp, bottom = panelHeight)
-                        .statusBarsPadding()
-                } else {
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = platterTop + platterSize + 16.dp, bottom = panelHeight)
-                        .padding(horizontal = 24.dp, vertical = 12.dp)
-                },
-                verticalArrangement = if (landscape) Arrangement.Center else Arrangement.Top,
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = platterTop + platterSize + 16.dp, bottom = panelHeight)
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 // Title/artist fade to the new song. Long ones scroll (marquee) while the
                 // record plays (the screen is redrawing for the spin then anyway), and rest
@@ -665,19 +647,6 @@ fun TurntableScreen(
                         }
                     }
                 }
-                if (landscape) {
-                    Spacer(Modifier.height(20.dp))
-                    ControlKeys(
-                        playing = ui.playing,
-                        repeatOne = ui.repeatOne,
-                        night = { roomLight().night },
-                        onStartStop = { coverClosed = false; vm.onIntent(UserIntent.StartStop) },
-                        onCue = { coverClosed = false; vm.onIntent(UserIntent.Cue) },
-                        onRepeat = { vm.onIntent(UserIntent.ToggleRepeat) },
-                        onPrevious = { coverClosed = false; vm.onIntent(UserIntent.Flick(-1)) },
-                        onNext = { coverClosed = false; vm.onIntent(UserIntent.Flick(+1)) },
-                    )
-                }
             }
 
             // The controls live on the FRONT of the plinth:
@@ -685,8 +654,7 @@ fun TurntableScreen(
             // place, needle hovers) · ↻1 repeat one · ▶▶| next.
             // It takes the room's light itself (so its keys stay readable and lit keys glow).
             val panelPalette = remember(art) { art?.let(::extractVinylPalette) }
-            // (In landscape the keys sit under the title instead, so there is no panel.)
-            if (!landscape) FrontPanel(
+            FrontPanel(
                 style = backdrop,
                 albumPalette = panelPalette,
                 paint = deck.panelPaint,
@@ -704,14 +672,12 @@ fun TurntableScreen(
             )
 
             // Dust cover over the top plate (not the front panel: that stays reachable).
-            // In landscape there is no panel, so it covers everything.
             DustCover(
                 closed = coverClosed,
                 light = deck.isLight,
                 onOpen = { coverClosed = false },
                 night = { roomLight().night },
-                modifier = if (landscape) Modifier.fillMaxSize()
-                else Modifier
+                modifier = Modifier
                     .fillMaxWidth()
                     .height(screenHeight - panelHeight),
             )
@@ -924,15 +890,6 @@ private fun PhoneSettingsEffects(settings: Settings, lightRoom: Boolean, audible
 }
 
 /** The screen dims after this long without a touch while a record plays. */
-/**
- * Landscape: the platter is bigger than the screen is tall and bleeds off the left and bottom,
- * like the portrait one. Its centre sits low enough that the arm's base plate (about one
- * radius above the spindle) stays on screen.
- */
-private const val LANDSCAPE_PLATTER = 1.10f      // of the screen's height
-private const val LANDSCAPE_SPINDLE_Y = 0.58f    // of the screen's height
-private const val LANDSCAPE_BLEED = 0.22f        // of the platter, off the left edge
-
 private const val DIM_IDLE_MS = 5 * 60 * 1000L
 
 /** How dark the veil over a dimmed screen is. */

@@ -157,31 +157,6 @@ fun FrontPanel(
     }
 }
 
-/**
- * The same five keys without the plinth: a plain row, for landscape, where they sit
- * under the song's title instead of on a panel.
- */
-@Composable
-fun ControlKeys(
-    playing: Boolean,
-    repeatOne: Boolean,
-    night: () -> Float,
-    onStartStop: () -> Unit,
-    onCue: () -> Unit,
-    onRepeat: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Key(KeyIcon.Previous, "Previous song", lit = false, night, onPrevious, onHoldRepeat = onPrevious)
-        Key(KeyIcon.StartStop, if (playing) "Stop" else "Start", lit = playing, night, onStartStop)
-        Key(KeyIcon.Cue, "Cue: lift or lower the needle", lit = false, night, onCue)
-        Key(KeyIcon.RepeatOne, "Repeat one", lit = repeatOne, night, onRepeat, state = if (repeatOne) "On" else "Off")
-        Key(KeyIcon.Next, "Next song", lit = false, night, onNext, onHoldRepeat = onNext)
-    }
-}
-
 // ------------------------------------------------------------------ materials
 
 private fun lipBrush(style: BackdropStyle, album: Pair<Color, Color>): Brush = when (style) {
