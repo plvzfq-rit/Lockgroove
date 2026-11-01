@@ -19,6 +19,7 @@ import io.github.plvzfqrit.lockgroove.core.playback.PlayerCommand
 import io.github.plvzfqrit.lockgroove.core.playback.PlayerSnapshot
 import io.github.plvzfqrit.lockgroove.core.playback.PositionTracker
 import io.github.plvzfqrit.lockgroove.core.settings.Settings
+import io.github.plvzfqrit.lockgroove.core.settings.SkipStyle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,6 +112,12 @@ class TurntableController(
     // ---- "Watch a day go by": the sun through 24 hours in a few seconds
     private var dayPreview: DayPreview? = null
 
+    // ---- Snap skipping: the music flows on and the deck snaps to whatever the player reports
+    /** Until this time, a song change (or seek) the player reports is the answer to our skip. */
+    private var snapUntil = 0L
+    /** A real "previous" waits for its rewind: send it at this time (0 = none due). */
+    private var previousDueAt = 0L
+
     // ---- Opening and coming back
     private sealed interface Phase {
         data object Stopped : Phase
@@ -127,15 +134,21 @@ class TurntableController(
     /** The followed player's latest report (null = nothing playing). */
     fun onSnapshot(s: PlayerSnapshot?) {
         val prev = song
-        if (prev != null && s != null && PositionTracker.isSeek(prev, s)) seekId++
+        val snapping = clock.nowMs() < snapUntil
+        if (!snapping && prev != null && s != null && PositionTracker.isSeek(prev, s)) seekId++
         // The song changed by itself while the needle was on it, a few seconds early:
         // the player's crossfade. Lift that much sooner next time.
         if (prev != null && s != null && crossfade.observe(prev, s, needleWasOnPrev = needleOn == prev.key,
-                flicking = skips.browsing || skips.queued != 0, now = clock.nowMs())) {
+                flicking = skips.browsing || skips.queued != 0 || snapping, now = clock.nowMs())) {
             _settings.value = _settings.value.copy(learnedCrossfades = crossfade.learned)
         }
         if (s?.key != prev?.key) playedMs = 0L
         song = s
+        // The answer to a snap skip: no arm choreography, just be where the player is.
+        if (snapping && phase == Phase.Running && s != null && prev != null &&
+            (s.key != prev.key || PositionTracker.isSeek(prev, s))) {
+            snapToPlayer()
+        }
         refresh()
     }
 
@@ -205,7 +218,7 @@ class TurntableController(
                 }
             }
             UserIntent.ToggleRepeat -> _settings.value = _settings.value.copy(repeatOne = !_settings.value.repeatOne)
-            is UserIntent.Flick -> skips.flick(intent.dir, clock.nowMs())
+            is UserIntent.Flick -> if (canSnapSkip()) snapSkip(intent.dir) else skips.flick(intent.dir, clock.nowMs())
             is UserIntent.HoldArm -> grabAngle = intent.angleDeg
             UserIntent.LetGoOfArm -> letGoOfArm()
         }
@@ -315,14 +328,44 @@ class TurntableController(
                 }
             }
         }
+        if (previousDueAt != 0L && now >= previousDueAt) {
+            previousDueAt = 0L
+            send(PlayerCommand.Previous)
+            snapUntil = now + SNAP_WINDOW_MS
+        }
         sendAll(arbiter.onTick())
         refresh()
     }
 
     // ----------------------------------------------------------------- logic
 
+    /** Snap only when music is playing with the needle down: a stopped deck stays stopped. */
+    private fun canSnapSkip() = _settings.value.skipStyle == SkipStyle.Snap &&
+            phase == Phase.Running && arbiter.wantPlaying && needleOn != null &&
+            !skips.browsing && skips.queued == 0 && !end.inLeadOut && grabAngle == null
+
+    /** Skip with the music still playing; [onSnapshot] snaps the deck when the player answers. */
+    private fun snapSkip(dir: Int) {
+        val now = clock.nowMs()
+        snapUntil = now + SNAP_WINDOW_MS
+        if (dir > 0) {
+            send(PlayerCommand.Next)
+            return
+        }
+        // A real previous: players restart the song instead once you're a few seconds in.
+        val position = song?.let { PositionTracker.positionAt(it, now) }
+        if (position != null && position >= SkipQueue.PREVIOUS_RESTART_MS) {
+            send(PlayerCommand.SeekTo(0L))
+            previousDueAt = now + SkipQueue.REWOUND_PAUSE_MS
+        } else {
+            send(PlayerCommand.Previous)
+        }
+    }
+
     /** Be exactly where the player is: record on, needle down if it's playing. */
     private fun snapToPlayer() {
+        end.reset()
+        dropAngle = null
         settled = discFor(song)
         candidate = settled
         val playing = song?.sounding == true
@@ -470,6 +513,8 @@ class TurntableController(
         const val LIGHT_CHECK_MS = 30_000L
         /** A cue jump waits at most this long for the needle to lift. */
         const val CUE_JUMP_TIMEOUT_MS = 2000L
+        /** After a snap skip, a song change within this long is the player's answer to it. */
+        const val SNAP_WINDOW_MS = 4000L
         /** Used to creep the needle inward when the player doesn't report a length. */
         const val NOMINAL_TRACK_MS = 4 * 60 * 1000L
     }
