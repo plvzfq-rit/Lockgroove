@@ -72,6 +72,8 @@ class PlaybackArbiter(private val clock: Clock) {
 
     fun onNeedleUp(): List<PlayerCommand> {
         inLeadOut = false
+        // Already silent (the lead-out paused it): a second pause only gets in the player's way.
+        if (seen?.playing == false) return emptyList()
         return command(false)
     }
 
@@ -85,9 +87,6 @@ class PlaybackArbiter(private val clock: Clock) {
     fun leaveLeadOut() {
         inLeadOut = false
     }
-
-    /** A pause right behind a skip, so a player that auto-plays is silenced at once. */
-    fun silence(): List<PlayerCommand> = command(false)
 
     /**
      * A player report. A mismatch with the needle gets a moment before it counts:

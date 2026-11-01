@@ -109,4 +109,14 @@ class PlaybackArbiterTest {
         assertEquals(listOf(PlayerCommand.Pause), report(playing = true, touching = false, needleDown = false))
         assertTrue(arbiter.wantPlaying)
     }
+
+    @Test fun `lifting the needle doesn't pause a player that is already silent`() {
+        report(playing = false, touching = true)
+        assertEquals(emptyList(), arbiter.onNeedleUp())
+    }
+
+    @Test fun `lifting the needle pauses a player that is playing`() {
+        report(playing = true, touching = true)
+        assertEquals(listOf(PlayerCommand.Pause), arbiter.onNeedleUp())
+    }
 }

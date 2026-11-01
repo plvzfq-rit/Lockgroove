@@ -34,10 +34,10 @@ class SkipQueueTest {
         assertEquals(1, q.queued)
     }
 
-    @Test fun `each skip is sent with a silencing pause behind it`() {
+    @Test fun `each skip is sent on its own, with no pause behind it that could catch the player mid-load`() {
         q.flick(+1, now)
         val out = run(300, key = { a })
-        assertEquals(listOf(SkipEffect.Send(PlayerCommand.Next), SkipEffect.Silence), out)
+        assertEquals(listOf(SkipEffect.Send(PlayerCommand.Next)), out)
     }
 
     @Test fun `three quick flicks send three nexts, one at a time`() {

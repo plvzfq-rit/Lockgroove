@@ -310,7 +310,6 @@ class TurntableController(
             )
             for (e in effects) when (e) {
                 is SkipEffect.Send -> send(e.command)
-                SkipEffect.Silence -> sendAll(arbiter.silence())
             }
         }
         sendAll(arbiter.onTick())

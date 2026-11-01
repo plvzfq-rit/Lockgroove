@@ -6,8 +6,6 @@ import io.github.plvzfqrit.lockgroove.core.playback.PlayerCommand
 /** Something the skip queue needs done. */
 sealed interface SkipEffect {
     data class Send(val command: PlayerCommand) : SkipEffect
-    /** A pause right behind a skip, in case the player auto-plays (goes through the arbiter). */
-    data object Silence : SkipEffect
 }
 
 /*
@@ -147,7 +145,7 @@ class SkipQueue {
         lastSentAt = now
         phase = Phase.AwaitingChange(before, now + SKIP_WAIT_MS)
         val skip = if (dir > 0) PlayerCommand.Next else PlayerCommand.Previous
-        return listOf(SkipEffect.Send(skip), SkipEffect.Silence)
+        return listOf(SkipEffect.Send(skip))
     }
 
     companion object {
