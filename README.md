@@ -120,10 +120,13 @@ There are two builds of the same app:
 
 - **standard**: the app described above. It has no internet permission at all.
 - **withLyrics**: the same app, installed beside it as a separate app (`.lyrics`), plus the
-  internet permission and one extra feature. A **Show lyrics** button appears
-  under the artist's name, in portrait and in landscape. Nothing is looked up until you tap it and allow it; after that
-  the song's title, artist and length are sent to [lrclib.net](https://lrclib.net) to fetch
-  synced lyrics. The ✕ turns it off again. Build it with `./gradlew :app:installWithLyricsRelease`.
+  internet permission and one extra feature. A **Get lyrics** button appears under the
+  artist's name, in portrait and in landscape. **Nothing is looked up by itself**: only when you
+  tap it for a song, and only after you allow it once. Then the song's title, artist and length
+  are sent to [lrclib.net](https://lrclib.net) to fetch synced lyrics. The lyrics you get are
+  kept on the phone (in the app's private storage, up to 500 songs), so a song is never looked
+  up twice, and turning the phone or leaving the app doesn't ask again. In Settings you can turn
+  lookups off and clear the saved lyrics. Build it with `./gradlew :app:installWithLyricsRelease`.
   Songs in Chinese, Korean, Japanese, Arabic and other scripts also get a reading in Latin
   letters under the line (pinyin with tone marks, romaji, and so on), and traditional Chinese
   can be shown in simplified characters (a Settings toggle). It is about 13 MB bigger than the

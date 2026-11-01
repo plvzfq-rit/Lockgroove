@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.MusicOff
@@ -30,41 +29,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricLine
-
-/** What the lyrics area knows about the song being played (once the listener has allowed lyrics). */
-sealed interface LyricsState {
-    /** Still asking. */
-    data object Looking : LyricsState
-
-    /** The lyrics database has nothing under this song's name. */
-    data object None : LyricsState
-
-    /** It has lyrics under that name, but none fit this recording. */
-    data object NoFit : LyricsState
-
-    /** The question couldn't be asked: offline, or the service was too busy. */
-    data object Unreachable : LyricsState
-
-    /** [readings] has one entry per line: its Latin-letter reading, or null when it needs none. */
-    data class Found(val lines: List<LyricLine>, val readings: List<String?>) : LyricsState
-}
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsState
 
 /**
- * The lyrics area. Off: a "Show lyrics" button (tapping it asks the listener first). On: the line
- * being sung (with its Latin-letter reading under it when it is in another script), and a ✕ that
- * turns it off again.
+ * The lyrics area. Until the listener asks for this song's lyrics: a "Get lyrics" button. Then
+ * the line being sung, with its Latin-letter reading under it when it is in another script.
  * @param index the line being sung now (-1 before the first)
  * @param compact the gap in portrait: wide but short, so fewer rows (it counts how many fit, and
  *        draws nothing when there is no room at all)
  */
 @Composable
 fun LyricsPanel(
-    on: Boolean,
     state: LyricsState,
     index: Int,
     color: Color,
-    onShow: () -> Unit,
-    onHide: () -> Unit,
+    onGet: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
@@ -74,20 +53,21 @@ fun LyricsPanel(
         val lyricRows = if (!compact) 3 else if (maxHeight >= ROOMY_COMPACT_HEIGHT) 2 else 1
         val readingRows = if (compact) 1 else 2
         val lyricSize = if (compact) 15 else 16
-        if (!on) {
+        if (state == LyricsState.Idle) {
             Box(
                 Modifier
                     .align(Alignment.TopStart)
                     .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(50))
-                    .clickable(role = Role.Button, onClickLabel = "Show lyrics", onClick = onShow)
+                    .clickable(role = Role.Button, onClickLabel = "Get the lyrics of this song", onClick = onGet)
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
-                Text("Show lyrics", color = color.copy(alpha = 0.8f), fontSize = 14.sp)
+                Text("Get lyrics", color = color.copy(alpha = 0.8f), fontSize = 14.sp)
             }
             return@BoxWithConstraints
         }
-        Column(Modifier.fillMaxWidth().padding(end = 36.dp)) {
+        Column(Modifier.fillMaxWidth()) {
             when (state) {
+                LyricsState.Idle -> Unit
                 LyricsState.Looking -> Hint("Looking for lyrics…", color)
                 LyricsState.None -> Notice(Icons.Filled.MusicOff, "No lyrics for this song", color, onRetry, compact)
                 LyricsState.NoFit -> Notice(Icons.Filled.CompareArrows, "Lyrics don't fit this recording", color, onRetry, compact)
@@ -102,15 +82,6 @@ fun LyricsPanel(
                     }
                 }
             }
-        }
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .size(36.dp)
-                .clickable(role = Role.Button, onClickLabel = "Hide lyrics", onClick = onHide),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.Close, contentDescription = "Hide lyrics", tint = color.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
         }
     }
 }

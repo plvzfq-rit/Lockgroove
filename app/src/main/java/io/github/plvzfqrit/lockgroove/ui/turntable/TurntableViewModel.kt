@@ -14,15 +14,23 @@ import io.github.plvzfqrit.lockgroove.data.PlayLogStore
 import io.github.plvzfqrit.lockgroove.data.Plays
 import io.github.plvzfqrit.lockgroove.data.SettingsStore
 import io.github.plvzfqrit.lockgroove.media.MediaSessionWatcher
+import io.github.plvzfqrit.lockgroove.lyrics.JapaneseReaders
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsSession
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsState
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Holds the turntable controller (so it survives rotation), feeds it the player's
@@ -42,6 +50,22 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
     val art = MediaSessionWatcher.art
     val look: StateFlow<Look> = store.look.stateIn(viewModelScope, SharingStarted.Eagerly, Look())
 
+    // Lyrics (the "withLyrics" build only). They live here, not in the screen, so turning the phone
+    // never asks again; and nothing is fetched until the listener taps "Get lyrics".
+    private val lyrics = LyricsSession(
+        viewModelScope,
+        LyricsStore(app),
+        controller.ui
+            .map { if (it.player == null) null else LyricsSession.SongId(it.title, it.artist, it.durationMs) }
+            .distinctUntilChanged(),
+        controller.settings.map { it.simplifiedChinese }.distinctUntilChanged(),
+    )
+    val lyricsState: StateFlow<LyricsState> = lyrics.state
+    /** How many songs' lyrics are saved on the phone. */
+    val savedLyrics: StateFlow<Int> = lyrics.saved
+    fun requestLyrics(fresh: Boolean = false) = lyrics.request(fresh)
+    fun clearSavedLyrics() = lyrics.clearSaved()
+
     private var ticker: Job? = null
 
     init {
@@ -51,6 +75,12 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
             controller.updateSettings { saved }
             // From here on, whatever changes (the sheet, ↻1, a learned crossfade) is saved.
             controller.settings.drop(1).collect { store.save(it) }
+        }
+        // Lookups switched off: let go of the (big) Japanese dictionary.
+        viewModelScope.launch {
+            controller.settings.map { it.lyrics }.distinctUntilChanged().collect { allowed ->
+                if (!allowed) withContext(Dispatchers.Default) { JapaneseReaders.reader()?.release() }
+            }
         }
     }
 
@@ -67,6 +97,7 @@ class TurntableViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onStop() {
+        viewModelScope.launch(Dispatchers.Default) { JapaneseReaders.reader()?.release() }   // not needed off screen
         ticker?.cancel()
         ticker = null
         controller.onStop()

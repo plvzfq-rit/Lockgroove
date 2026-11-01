@@ -57,19 +57,15 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
-import io.github.plvzfqrit.lockgroove.core.lyrics.LyricScripts
 import io.github.plvzfqrit.lockgroove.core.lyrics.LyricsTracker
-import io.github.plvzfqrit.lockgroove.lyrics.JapaneseReaders
-import io.github.plvzfqrit.lockgroove.lyrics.Romanizer
 import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
-import io.github.plvzfqrit.lockgroove.lyrics.LyricsResult
+import io.github.plvzfqrit.lockgroove.lyrics.LyricsState
 import kotlinx.coroutines.isActive
 import io.github.plvzfqrit.lockgroove.ui.common.rememberBreath
 import androidx.compose.runtime.snapshotFlow
@@ -384,43 +380,11 @@ fun TurntableScreen(
         val navRight = WindowInsets.navigationBars.asPaddingValues().calculateRightPadding(LayoutDirection.Ltr)
         val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val k = minOf(maxHeight / LANDSCAPE_REF_H, (maxWidth - navRight) / LANDSCAPE_REF_W)
-        // Lyrics (the "withLyrics" build only): a landscape feature, off until the listener allows it.
+        // Lyrics (the "withLyrics" build only) live in the view model, so turning the phone never
+        // asks again, and nothing is fetched until the listener taps "Get lyrics".
         var askLyrics by remember { mutableStateOf(false) }
-        val lyricsOn = LyricsFeature.available && settings.lyrics
-        // Retry: ask again for this song right away, skipping any answer that was kept.
-        val lyricsSong = "${ui.title}|${ui.artist}|${ui.durationMs}"
-        var retriedSong by remember { mutableStateOf("") }
-        var retryCount by remember { mutableIntStateOf(0) }
-        // Step 1: what the lookup came back with (null while still asking).
-        val fetchedLyrics by produceState<LyricsResult?>(null, lyricsSong, ui.player, lyricsOn, retryCount) {
-            value = null
-            val source = LyricsFeature.source()
-            if (!lyricsOn || source == null || ui.player == null) return@produceState
-            val retrying = retriedSong == lyricsSong
-            if (!retrying) delay(800)                               // skipping through songs asks for nothing
-            value = source.find(ui.title, ui.artist, ui.durationMs, fresh = retrying)
-        }
-        // Step 2: the finished lines and their Latin-letter readings, worked out once per song in
-        // the background (a dictionary lookup must never run while the screen is being drawn).
-        val simplifiedChinese = settings.simplifiedChinese
-        val lyricsState by produceState<LyricsState>(LyricsState.Looking, fetchedLyrics, simplifiedChinese) {
-            value = when (val fetched = fetchedLyrics) {
-                null -> LyricsState.Looking
-                LyricsResult.NotFound -> LyricsState.None
-                LyricsResult.NoFit -> LyricsState.NoFit
-                LyricsResult.Unreachable -> LyricsState.Unreachable
-                is LyricsResult.Found -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    val shown = if (simplifiedChinese) {
-                        fetched.lines.map { if (LyricScripts.isChinese(it.text)) it.copy(text = Romanizer.simplify(it.text)) else it }
-                    } else fetched.lines
-                    LyricsState.Found(shown, shown.map { Romanizer.romanize(it.text) })
-                }
-            }
-        }
-        // Lyrics off: let go of the Japanese dictionary (it is big); it loads again if lyrics come back.
-        LaunchedEffect(lyricsOn) {
-            if (!lyricsOn) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { JapaneseReaders.reader()?.release() }
-        }
+        val lyricsState by vm.lyricsState.collectAsStateWithLifecycle()
+        val savedLyrics by vm.savedLyrics.collectAsStateWithLifecycle()
         var lyricsIndex by remember { mutableIntStateOf(-1) }
         val foundLyrics = lyricsState as? LyricsState.Found
         LaunchedEffect(foundLyrics, ui.sounding) {
@@ -748,13 +712,11 @@ fun TurntableScreen(
                 // above the front panel in portrait, where it is wide but short).
                 if (LyricsFeature.available) {
                     LyricsPanel(
-                        on = lyricsOn,
                         state = lyricsState,
                         index = lyricsIndex,
                         color = litTextColor(deck.contentColor, RoomLight(night = nightNow)),
-                        onShow = { askLyrics = true },
-                        onHide = { vm.updateSettings { it.copy(lyrics = false) } },
-                        onRetry = { retriedSong = lyricsSong; retryCount++ },
+                        onGet = { if (settings.lyrics) vm.requestLyrics() else askLyrics = true },
+                        onRetry = { vm.requestLyrics(fresh = true) },
                         modifier = Modifier.weight(1f).padding(top = if (landscape) 12.dp else 8.dp),
                         compact = !landscape,
                     )
@@ -820,7 +782,11 @@ fun TurntableScreen(
                             "${LyricsFeature.source()?.serviceName ?: "an online service"} to find its lyrics.")
                     },
                     confirmButton = {
-                        TextButton(onClick = { askLyrics = false; vm.updateSettings { it.copy(lyrics = true) } }) { Text("Allow") }
+                        TextButton(onClick = {
+                            askLyrics = false
+                            vm.updateSettings { it.copy(lyrics = true) }
+                            vm.requestLyrics()
+                        }) { Text("Allow") }
                     },
                     dismissButton = { TextButton(onClick = { askLyrics = false }) { Text("Cancel") } },
                 )
@@ -847,6 +813,8 @@ fun TurntableScreen(
                     onSelectFinish = { vm.setLook(look.copy(finish = it)) },
                     onSettings = { new -> vm.updateSettings { new } },
                     onResetCrossfade = { ui.player?.let(vm::forgetCrossfade) },
+                    savedLyrics = savedLyrics,
+                    onClearLyrics = vm::clearSavedLyrics,
                     onPreviewDay = {
                         showSettings = false                                // so you can watch
                         vm.previewDay()
