@@ -96,6 +96,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -398,6 +399,11 @@ fun TurntableScreen(
         val drawnArmDeg by remember(armStepDeg) {
             derivedStateOf { (animator.armAngle.value / armStepDeg).roundToInt() * armStepDeg }
         }
+        // While the record swaps (it lifts, leaves, arrives) it passes OVER the tonearm's base
+        // instead of under it. Settled, it goes back under the arm, which lies on top of it.
+        val recordOverArm by remember {
+            derivedStateOf { animator.recordHeight.value > 0f || animator.recordTravel.value != 0f }
+        }
 
         // The settings knob sits under the tonearm, on the platter's baseline: a 54 dp square
         // (42 dp knob + 6 dp margin) whose bottom is on the baseline. Its backlight goes in
@@ -463,14 +469,13 @@ fun TurntableScreen(
                 )
             }
 
-            // Platter + record.
-            Box(
-                Modifier
-                    .offset(x = platterLeft, y = platterTop)
-                    .wrapContentSize(align = Alignment.TopStart, unbounded = true)
-                    .requiredSize(platterSize),
-            ) {
-                Spacer(Modifier.fillMaxSize().platterFelt())
+            // Platter, then the record in a layer of its own (so it can pass over the arm).
+            val platterBox = Modifier
+                .offset(x = platterLeft, y = platterTop)
+                .wrapContentSize(align = Alignment.TopStart, unbounded = true)
+                .requiredSize(platterSize)
+            Box(platterBox) { Spacer(Modifier.fillMaxSize().platterFelt()) }
+            Box(platterBox.zIndex(if (recordOverArm) 1f else 0f)) {
                 if (disc != null) {
                     VinylRecord(
                         art = art,
