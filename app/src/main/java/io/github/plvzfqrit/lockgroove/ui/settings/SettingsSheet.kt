@@ -62,6 +62,7 @@ import io.github.plvzfqrit.lockgroove.core.lighting.LightingMode
 import io.github.plvzfqrit.lockgroove.core.look.Paint
 import io.github.plvzfqrit.lockgroove.core.model.RecordSizeChoice
 import io.github.plvzfqrit.lockgroove.core.settings.MotionQuality
+import io.github.plvzfqrit.lockgroove.core.settings.SkipStyle
 import io.github.plvzfqrit.lockgroove.core.settings.Scale
 import io.github.plvzfqrit.lockgroove.core.settings.Scales
 import io.github.plvzfqrit.lockgroove.core.settings.Settings
@@ -221,6 +222,25 @@ fun SettingsSheet(
                 }
                 Text(
                     text = "Gives up the last moment of each song so the next one never starts before the record is swapped.",
+                    fontSize = 12.sp,
+                    color = fg.copy(alpha = 0.6f),
+                )
+
+                // Skipping: the full ritual, or an instant snap.
+                Spacer(Modifier.height(14.dp))
+                Text("Skipping", fontSize = 15.sp)
+                Spacer(Modifier.height(8.dp))
+                ChoiceRow(
+                    options = SkipStyle.entries.map { it.label },
+                    selected = settings.skipStyle.ordinal,
+                    fg = fg,
+                ) { tick(); onSettings(settings.copy(skipStyle = SkipStyle.entries[it])) }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = when (settings.skipStyle) {
+                        SkipStyle.Ritual -> "The arm lifts, the music pauses, the record is swapped and the needle drops."
+                        SkipStyle.Snap -> "The music keeps playing and the deck snaps to the new song. No pause in between."
+                    },
                     fontSize = 12.sp,
                     color = fg.copy(alpha = 0.6f),
                 )

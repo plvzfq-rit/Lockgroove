@@ -28,6 +28,7 @@ class SettingsStore(context: Context) {
             // Before the sliders these were fixed choices, saved by name: read those once.
             spin = p[SPIN_SPEED] ?: p[OLD_SPIN]?.let { OLD_SPINS[it] } ?: d.spin,
             grooveGlints = p[GLINTS] ?: d.grooveGlints,
+            skipStyle = enumOr(p[SKIP_STYLE], d.skipStyle),
             pulseLabel = p[PULSE_LABEL] ?: d.pulseLabel,
             pulseTitle = p[PULSE_TITLE] ?: d.pulseTitle,
             motion = enumOr(p[MOTION], d.motion),
@@ -64,6 +65,7 @@ class SettingsStore(context: Context) {
         store.edit { p ->
             p[SPIN_SPEED] = s.spin
             p[GLINTS] = s.grooveGlints
+            p[SKIP_STYLE] = s.skipStyle.name
             p[PULSE_LABEL] = s.pulseLabel
             p[PULSE_TITLE] = s.pulseTitle
             p[MOTION] = s.motion.name
@@ -103,6 +105,7 @@ class SettingsStore(context: Context) {
         val PANEL_PAINT = intPreferencesKey("panel_paint")
         val SPIN_SPEED = floatPreferencesKey("spin_deg_per_sec")
         val GLINTS = booleanPreferencesKey("groove_glints")
+        val SKIP_STYLE = stringPreferencesKey("skip_style")
         val PULSE_LABEL = booleanPreferencesKey("pulse_label")
         val PULSE_TITLE = booleanPreferencesKey("pulse_title")
         val MOTION = stringPreferencesKey("motion")
