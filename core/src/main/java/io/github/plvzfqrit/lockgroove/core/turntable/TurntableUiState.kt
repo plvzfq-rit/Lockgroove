@@ -15,6 +15,8 @@ data class TurntableUiState(
     val audible: Boolean = false,
     /** The player says music is coming out. */
     val sounding: Boolean = false,
+    /** The player is buffering or connecting (counts as [sounding], but nothing is audible yet). */
+    val buffering: Boolean = false,
     /** The needle rests on a record. */
     val needleDown: Boolean = false,
     /** The arm can be picked up. */

@@ -26,6 +26,8 @@ data class PlayerSnapshot(
     val repeatOne: Boolean = false,
     /** The player sent album art for this song. */
     val hasArt: Boolean = false,
+    /** The player says "playing" but is only buffering or connecting: no sound yet. */
+    val buffering: Boolean = false,
 )
 
 /** What we can tell the player to do. */

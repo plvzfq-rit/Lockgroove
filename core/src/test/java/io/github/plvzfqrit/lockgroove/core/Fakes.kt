@@ -25,7 +25,8 @@ fun snapshot(
     player: String = "com.spotify.music",
     speed: Float = if (sounding) 1f else 0f,
     hasArt: Boolean = true,
+    buffering: Boolean = false,
 ) = io.github.plvzfqrit.lockgroove.core.playback.PlayerSnapshot(
     io.github.plvzfqrit.lockgroove.core.model.SongKey.of(title, "Artist"), title, "Artist", player,
-    sounding, positionMs, at, speed, durationMs, repeatOne, hasArt,
+    sounding, positionMs, at, speed, durationMs, repeatOne, hasArt, buffering,
 )

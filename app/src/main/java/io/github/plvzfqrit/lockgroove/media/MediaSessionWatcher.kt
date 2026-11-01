@@ -222,8 +222,9 @@ object MediaSessionWatcher {
             durationMs = (meta?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L).coerceAtLeast(0L),
             repeatOne = isRepeatOne(),
             hasArt = art != null,
+            buffering = state == PlayerState.Buffering || state == PlayerState.Connecting,
         )
-        Log.d(TAG, "[$packageName] $title by $artist, art=${art != null}, sounding=${snapshot.sounding}, " +
+        Log.d(TAG, "[$packageName] $title by $artist, art=${art != null}, state=$state, sounding=${snapshot.sounding}, " +
                 "pos=${snapshot.positionMs}/${snapshot.durationMs}")
         publish(context, snapshot, art)
     }

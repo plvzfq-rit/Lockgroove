@@ -126,4 +126,20 @@ class TurntableControllerTest {
         h.run(60_000)
         assertEquals(0, h.log.entries.size)
     }
+
+    @Test fun `a buffering player still counts as sounding but the screen is told it is buffering`() {
+        c.onSnapshot(snapshot(positionMs = 0, at = h.clock.nowMs(), buffering = true))
+        c.onStart()
+        h.run(1_000)
+        assertTrue(c.ui.value.sounding)
+        assertTrue(c.ui.value.buffering)
+        assertEquals(emptyList(), h.commands)
+    }
+
+    @Test fun `a player that is really playing is not buffering`() {
+        c.onSnapshot(playing())
+        c.onStart()
+        h.run(1_000)
+        assertTrue(!c.ui.value.buffering)
+    }
 }
