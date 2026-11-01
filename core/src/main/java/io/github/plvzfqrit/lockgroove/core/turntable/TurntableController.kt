@@ -406,7 +406,8 @@ class TurntableController(
         if (phase == Phase.Running) {
             settle(now)
             sendAll(arbiter.onPlayer(s?.sounding == true, s?.key, touching = s != null && needleOn == s.key,
-                needleDown = needleOn != null, naturalHandOff = end.isNaturalHandOff(needleOn, now)))
+                needleDown = needleOn != null, naturalHandOff = end.isNaturalHandOff(needleOn, now),
+                buffering = s?.buffering == true))
             _target.value = TurntableTarget(
                 disc = settled,
                 playing = arbiter.wantPlaying,

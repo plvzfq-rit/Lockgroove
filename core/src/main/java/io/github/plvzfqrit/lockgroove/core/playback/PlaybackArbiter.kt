@@ -43,7 +43,9 @@ class PlaybackArbiter(private val clock: Clock) {
     private var resumeGraceUntil = 0L
 
     // The latest player report, since when it's been like that, and whether we acted on it.
-    private data class Seen(val playing: Boolean, val key: SongKey?, val touching: Boolean, val needleDown: Boolean)
+    private data class Seen(
+        val playing: Boolean, val key: SongKey?, val touching: Boolean, val needleDown: Boolean, val buffering: Boolean,
+    )
     private var seen: Seen? = null
     private var seenSince = 0L
     private var graceMs = 0L
@@ -93,11 +95,14 @@ class PlaybackArbiter(private val clock: Clock) {
      * @param touching the needle rests on THIS song's record
      * @param naturalHandOff the song changed right at the end of the record: the
      *        player's own hand-off, not a glitch, so it counts at once
+     * @param buffering the player is only loading the song (it counts as [playing]): it's
+     *        left alone until it really plays, because a pause in mid-load can wedge it
      */
     fun onPlayer(
         playing: Boolean, key: SongKey?, touching: Boolean, needleDown: Boolean, naturalHandOff: Boolean = false,
+        buffering: Boolean = false,
     ): List<PlayerCommand> {
-        val now = Seen(playing, key, touching, needleDown)
+        val now = Seen(playing, key, touching, needleDown, buffering)
         if (now != seen) {
             seen = now
             seenSince = clock.nowMs()
@@ -122,18 +127,18 @@ class PlaybackArbiter(private val clock: Clock) {
             if (now - maxOf(seenSince, resumeGraceUntil) < graceMs) return emptyList()
             acted = true
             lastSafetyCheck = now
-            return evaluate(s.playing, s.touching)
+            return evaluate(s.playing, s.touching, s.buffering)
         }
         // Safety net: music playing while the needle is UP (a player that ignored a
         // pause, e.g. mid-transition). Re-check every second and pause it again.
-        if (s.playing && !s.needleDown && now - lastSafetyCheck >= SAFETY_CHECK_MS) {
+        if (s.playing && !s.buffering && !s.needleDown && now - lastSafetyCheck >= SAFETY_CHECK_MS) {
             lastSafetyCheck = now
-            return evaluate(playing = true, touching = false)
+            return evaluate(playing = true, touching = false, buffering = false)
         }
         return emptyList()
     }
 
-    private fun evaluate(playing: Boolean, touching: Boolean): List<PlayerCommand> {
+    private fun evaluate(playing: Boolean, touching: Boolean, buffering: Boolean): List<PlayerCommand> {
         pending?.let { p ->
             if (playing == p) {
                 pending = null                                   // confirmed: this report is
@@ -146,6 +151,8 @@ class PlaybackArbiter(private val clock: Clock) {
         }
         // In the lead-out, silence with the needle down is correct: don't "fix" it.
         if (inLeadOut && touching && !playing) return emptyList()
+        // Still loading a song we don't want yet: wait. Once it really plays, it's paused.
+        if (buffering && playing && !touching) return emptyList()
         return when {
             // Sound without the needle on this record: hold it, and go drop the needle.
             playing && !touching -> {

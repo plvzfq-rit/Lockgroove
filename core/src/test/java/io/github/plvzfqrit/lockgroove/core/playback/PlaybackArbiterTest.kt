@@ -12,8 +12,10 @@ class PlaybackArbiterTest {
     private val arbiter = PlaybackArbiter(clock)
     private val song = SongKey.of("Song A", "Artist")
 
-    private fun report(playing: Boolean, touching: Boolean, needleDown: Boolean = touching, natural: Boolean = false) =
-        arbiter.onPlayer(playing, song, touching, needleDown, natural)
+    private fun report(
+        playing: Boolean, touching: Boolean, needleDown: Boolean = touching, natural: Boolean = false,
+        buffering: Boolean = false,
+    ) = arbiter.onPlayer(playing, song, touching, needleDown, natural, buffering)
 
     @Test fun `music without the needle is paused, and the needle goes to it`() {
         val cmds = report(playing = true, touching = false)
@@ -98,5 +100,13 @@ class PlaybackArbiterTest {
         arbiter.adopt(playing = true)
         assertTrue(arbiter.wantPlaying)
         assertEquals(emptyList(), report(playing = true, touching = true))
+    }
+
+    @Test fun `a player still loading a song is left alone, and paused once it really plays`() {
+        assertEquals(emptyList(), report(playing = true, touching = false, needleDown = false, buffering = true))
+        clock.advance(5_000)
+        assertEquals(emptyList(), arbiter.onTick())              // the safety net waits too
+        assertEquals(listOf(PlayerCommand.Pause), report(playing = true, touching = false, needleDown = false))
+        assertTrue(arbiter.wantPlaying)
     }
 }
