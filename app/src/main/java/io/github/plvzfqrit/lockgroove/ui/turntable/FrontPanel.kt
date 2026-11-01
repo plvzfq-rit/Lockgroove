@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.toArgb
 import io.github.plvzfqrit.lockgroove.core.lighting.RoomLight
@@ -96,6 +97,8 @@ fun FrontPanel(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Extra room at the right edge for the navigation bar, when it sits there (landscape). */
+    endInset: Dp = 0.dp,
 ) {
     // Album Blur: the front's two album colors glide to the new record's colors
     // instead of switching at once (in step with the background's own fade).
@@ -139,7 +142,7 @@ fun FrontPanel(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, top = 12.dp + 19.dp),   // keys centred on the face
+                .padding(start = 12.dp, end = 12.dp + endInset, top = 12.dp + 19.dp),   // keys centred on the face
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Hold |◀◀ / ▶▶| to run through songs, faster and faster.
