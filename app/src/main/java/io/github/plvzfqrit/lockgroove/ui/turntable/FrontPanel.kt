@@ -49,7 +49,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.toArgb
 import io.github.plvzfqrit.lockgroove.core.lighting.RoomLight
@@ -97,8 +96,6 @@ fun FrontPanel(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
-    /** Extra room at the right edge for the navigation bar, when it sits there (landscape). */
-    endInset: Dp = 0.dp,
 ) {
     // Album Blur: the front's two album colors glide to the new record's colors
     // instead of switching at once (in step with the background's own fade).
@@ -142,7 +139,7 @@ fun FrontPanel(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp + endInset, top = 12.dp + 19.dp),   // keys centred on the face
+                .padding(start = 12.dp, end = 12.dp, top = 12.dp + 19.dp),   // keys centred on the face
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Hold |◀◀ / ▶▶| to run through songs, faster and faster.
@@ -157,6 +154,31 @@ fun FrontPanel(
             Spacer(Modifier.weight(1f))
             Key(KeyIcon.Next, "Next song", lit = false, night, onNext, onHoldRepeat = onNext)
         }
+    }
+}
+
+/**
+ * The same five keys without the plinth: a plain row, for landscape, where they sit
+ * under the song's title instead of on a panel.
+ */
+@Composable
+fun ControlKeys(
+    playing: Boolean,
+    repeatOne: Boolean,
+    night: () -> Float,
+    onStartStop: () -> Unit,
+    onCue: () -> Unit,
+    onRepeat: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Key(KeyIcon.Previous, "Previous song", lit = false, night, onPrevious, onHoldRepeat = onPrevious)
+        Key(KeyIcon.StartStop, if (playing) "Stop" else "Start", lit = playing, night, onStartStop)
+        Key(KeyIcon.Cue, "Cue: lift or lower the needle", lit = false, night, onCue)
+        Key(KeyIcon.RepeatOne, "Repeat one", lit = repeatOne, night, onRepeat, state = if (repeatOne) "On" else "Off")
+        Key(KeyIcon.Next, "Next song", lit = false, night, onNext, onHoldRepeat = onNext)
     }
 }
 
