@@ -76,6 +76,7 @@ object MediaSessionWatcher {
     /** Send a command to the followed player. */
     fun send(command: PlayerCommand) {
         val controls = watched?.transportControls ?: return
+        Log.d(TAG, "send $command")
         when (command) {
             PlayerCommand.Play -> controls.play()
             PlayerCommand.Pause -> controls.pause()
