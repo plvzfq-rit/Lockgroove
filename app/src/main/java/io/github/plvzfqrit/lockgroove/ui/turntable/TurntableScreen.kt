@@ -397,11 +397,7 @@ fun TurntableScreen(
         }
         val platterSize = if (landscape) LANDSCAPE_PLATTER * k else maxWidth * 1.213f
         val platterRadius = platterSize / 2
-        // Portrait: high up, 8 dp higher than it was to give the text below room, but never so high that
-        // the tonearm's top hardware (about 0.06 of a radius above the record) tucks under the status bar.
-        val portraitTop = (maxHeight - platterSize) / 2 * (1 - 0.65f)
-        val platterTop = if (landscape) LANDSCAPE_PLATTER_TOP * k
-        else minOf(portraitTop, maxOf(portraitTop - 8.dp, statusTop + platterRadius * 0.06f))
+        val platterTop = if (landscape) LANDSCAPE_PLATTER_TOP * k else (maxHeight - platterSize) / 2 * (1 - 0.65f)
         val platterLeft = if (landscape) LANDSCAPE_PLATTER_LEFT * k else (maxWidth - platterSize) / 2 * (1 + 2.13f)
         val spindleX = platterLeft + platterRadius
         val spindleY = platterTop + platterRadius
@@ -689,8 +685,8 @@ fun TurntableScreen(
                 } else {
                     Modifier
                         .fillMaxWidth()
-                        .padding(top = platterTop + platterSize + 8.dp, bottom = panelHeight)
-                        .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 12.dp)
+                        .padding(top = platterTop + platterSize + 16.dp, bottom = panelHeight)
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
                 }
             ) {
                 // Title/artist fade to the new song. Long ones scroll (marquee) while the
@@ -712,17 +708,16 @@ fun TurntableScreen(
                         }
                     }
                 }
-                // "withLyrics" build: the space under the artist (above the ribbon in landscape,
-                // above the front panel in portrait, where it is wide but short).
-                if (LyricsFeature.available) {
+                // "withLyrics" build, landscape: the space between the artist and the ribbon.
+                // (Portrait has no lyrics for now: that attempt is on the portrait-lyrics branch.)
+                if (landscape && LyricsFeature.available) {
                     LyricsPanel(
                         state = lyricsState,
                         index = lyricsIndex,
                         color = litTextColor(deck.contentColor, RoomLight(night = nightNow)),
                         onGet = { if (settings.lyrics) vm.requestLyrics() else askLyrics = true },
                         onRetry = { vm.requestLyrics(fresh = true) },
-                        modifier = Modifier.weight(1f).padding(top = if (landscape) 12.dp else 8.dp),
-                        compact = !landscape,
+                        modifier = Modifier.weight(1f).padding(top = 12.dp),
                     )
                 }
             }
