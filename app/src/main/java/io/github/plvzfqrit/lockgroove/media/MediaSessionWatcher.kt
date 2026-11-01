@@ -73,27 +73,15 @@ object MediaSessionWatcher {
         mainHandler.postDelayed(refreshRunnable, REFRESH_COALESCE_MS)
     }
 
-    private var swapFocus: SwapFocus? = null
-
     /** Send a command to the followed player. */
     fun send(command: PlayerCommand) {
         val controls = watched?.transportControls ?: return
         Log.d(TAG, "send $command")
-        val focus = appContext?.let { ctx -> swapFocus ?: SwapFocus(ctx).also { swapFocus = it } }
         when (command) {
-            PlayerCommand.Play -> {
-                focus?.release()                                        // the needle is down: let it play
-                controls.play()
-            }
+            PlayerCommand.Play -> controls.play()
             PlayerCommand.Pause -> controls.pause()
-            PlayerCommand.Next -> {
-                focus?.hold()                                           // no blip of the new song
-                controls.skipToNext()
-            }
-            PlayerCommand.Previous -> {
-                focus?.hold()
-                controls.skipToPrevious()
-            }
+            PlayerCommand.Next -> controls.skipToNext()
+            PlayerCommand.Previous -> controls.skipToPrevious()
             is PlayerCommand.SeekTo -> controls.seekTo(command.ms)
         }
     }
