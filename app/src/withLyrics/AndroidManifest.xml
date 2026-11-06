@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- Only this build asks for the internet, and only to look lyrics up once the listener says yes. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-</manifest>

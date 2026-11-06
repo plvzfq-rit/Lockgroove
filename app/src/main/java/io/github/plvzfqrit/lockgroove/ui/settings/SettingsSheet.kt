@@ -62,8 +62,6 @@ import io.github.plvzfqrit.lockgroove.core.lighting.LightingMode
 import io.github.plvzfqrit.lockgroove.core.look.Paint
 import io.github.plvzfqrit.lockgroove.core.model.RecordSizeChoice
 import io.github.plvzfqrit.lockgroove.core.settings.MotionQuality
-import io.github.plvzfqrit.lockgroove.core.lyrics.SavedLyrics
-import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
 import io.github.plvzfqrit.lockgroove.core.settings.Scale
 import io.github.plvzfqrit.lockgroove.core.settings.Scales
 import io.github.plvzfqrit.lockgroove.core.settings.Settings
@@ -100,9 +98,6 @@ fun SettingsSheet(
     onSelectFinish: (VinylFinish) -> Unit,
     onSettings: (Settings) -> Unit,
     onResetCrossfade: () -> Unit,
-    /** How many songs' lyrics are saved on the phone (the "withLyrics" build). */
-    savedLyrics: Int,
-    onClearLyrics: () -> Unit,
     /** Play the sun through a whole day, in under a minute. */
     onPreviewDay: () -> Unit,
     /** Choose a time of day for the sun, on a card over the deck. */
@@ -212,47 +207,6 @@ fun SettingsSheet(
                     checked = settings.pulseTitle,
                     fg = fg, bg = bg,
                 ) { tick(); onSettings(settings.copy(pulseTitle = it)) }
-                if (LyricsFeature.available) {
-                    ToggleRow(
-                        title = "Look up lyrics",
-                        subtitle = "Lets the Get lyrics button send a song's title, artist and length to ${LyricsFeature.source()?.serviceName ?: "an online service"}",
-                        checked = settings.lyrics,
-                        fg = fg, bg = bg,
-                    ) { tick(); onSettings(settings.copy(lyrics = it)) }
-                    ToggleRow(
-                        title = "Simplified Chinese lyrics",
-                        subtitle = "Show traditional Chinese lyrics in simplified characters",
-                        checked = settings.simplifiedChinese,
-                        fg = fg, bg = bg,
-                    ) { tick(); onSettings(settings.copy(simplifiedChinese = it)) }
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Saved lyrics", fontSize = 15.sp)
-                            Text(
-                                text = when (savedLyrics) {
-                                    0 -> "None yet: lyrics you get are kept on this phone for ${SavedLyrics.MAX_AGE_DAYS} days"
-                                    1 -> "1 song's lyrics, kept for up to ${SavedLyrics.MAX_AGE_DAYS} days"
-                                    else -> "$savedLyrics songs' lyrics, kept for up to ${SavedLyrics.MAX_AGE_DAYS} days"
-                                },
-                                fontSize = 12.sp,
-                                color = fg.copy(alpha = 0.6f),
-                            )
-                        }
-                        if (savedLyrics > 0) {
-                            Text(
-                                text = "Clear",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .clickable(role = Role.Button) { tick(); onClearLyrics() }
-                                    .border(1.dp, fg.copy(alpha = 0.3f), RoundedCornerShape(50))
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                            )
-                        }
-                    }
-                }
 
             } }
             item { Column(Modifier.fillMaxWidth()) {

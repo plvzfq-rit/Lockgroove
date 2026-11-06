@@ -158,9 +158,6 @@ class TurntableController(
         tick()
     }
 
-    /** Where the followed song is right now (ms), or null with nothing playing. Read-only: no state changes. */
-    fun positionMs(): Long? = song?.let { PositionTracker.positionAt(it, clock.nowMs()) }
-
     /** Play the sun through a whole day, starting now (24 hours in [PREVIEW_DAY_MS]). */
     fun previewDay() {
         dayPreview = DayPreview(

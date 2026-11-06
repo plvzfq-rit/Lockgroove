@@ -44,9 +44,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,16 +55,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableIntStateOf
-import io.github.plvzfqrit.lockgroove.core.lyrics.LyricsTracker
-import io.github.plvzfqrit.lockgroove.lyrics.LyricsFeature
-import io.github.plvzfqrit.lockgroove.lyrics.LyricsState
-import kotlinx.coroutines.isActive
 import io.github.plvzfqrit.lockgroove.ui.common.rememberBreath
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
@@ -380,21 +373,6 @@ fun TurntableScreen(
         val navRight = WindowInsets.navigationBars.asPaddingValues().calculateRightPadding(LayoutDirection.Ltr)
         val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val k = minOf(maxHeight / LANDSCAPE_REF_H, (maxWidth - navRight) / LANDSCAPE_REF_W)
-        // Lyrics (the "withLyrics" build only) live in the view model, so turning the phone never
-        // asks again, and nothing is fetched until the listener taps "Get lyrics".
-        var askLyrics by remember { mutableStateOf(false) }
-        val lyricsState by vm.lyricsState.collectAsStateWithLifecycle()
-        val savedLyrics by vm.savedLyrics.collectAsStateWithLifecycle()
-        var lyricsIndex by remember { mutableIntStateOf(-1) }
-        val foundLyrics = lyricsState as? LyricsState.Found
-        LaunchedEffect(foundLyrics, ui.sounding) {
-            if (foundLyrics == null) { lyricsIndex = -1; return@LaunchedEffect }
-            while (isActive) {
-                lyricsIndex = LyricsTracker.currentIndex(foundLyrics.lines, vm.positionMs() ?: 0L)
-                if (!ui.sounding) break                             // paused: nothing moves, so stop looking
-                delay(250)
-            }
-        }
         val platterSize = if (landscape) LANDSCAPE_PLATTER * k else maxWidth * 1.213f
         val platterRadius = platterSize / 2
         val platterTop = if (landscape) LANDSCAPE_PLATTER_TOP * k else (maxHeight - platterSize) / 2 * (1 - 0.65f)
@@ -678,10 +656,7 @@ fun TurntableScreen(
                 if (landscape) {
                     Modifier
                         .fillMaxSize()
-                        .padding(
-                            start = LANDSCAPE_TEXT_LEFT * k, top = LANDSCAPE_TEXT_TOP * k,
-                            end = navRight + 20.dp, bottom = ribbonHeight + 8.dp,
-                        )
+                        .padding(start = LANDSCAPE_TEXT_LEFT * k, top = LANDSCAPE_TEXT_TOP * k, end = navRight + 20.dp)
                 } else {
                     Modifier
                         .fillMaxWidth()
@@ -707,18 +682,6 @@ fun TurntableScreen(
                             )
                         }
                     }
-                }
-                // "withLyrics" build, landscape: the space between the artist and the ribbon.
-                // (Portrait has no lyrics for now: that attempt is on the portrait-lyrics branch.)
-                if (landscape && LyricsFeature.available) {
-                    LyricsPanel(
-                        state = lyricsState,
-                        index = lyricsIndex,
-                        color = litTextColor(deck.contentColor, RoomLight(night = nightNow)),
-                        onGet = { if (settings.lyrics) vm.requestLyrics() else askLyrics = true },
-                        onRetry = { vm.requestLyrics(fresh = true) },
-                        modifier = Modifier.weight(1f).padding(top = 12.dp),
-                    )
                 }
             }
 
@@ -772,25 +735,6 @@ fun TurntableScreen(
                     .height(screenHeight - panelHeight),
             )
 
-            if (askLyrics) {
-                AlertDialog(
-                    onDismissRequest = { askLyrics = false },
-                    title = { Text("Show lyrics?") },
-                    text = {
-                        Text("Lockgroove will send the song's title, artist and length to " +
-                            "${LyricsFeature.source()?.serviceName ?: "an online service"} to find its lyrics.")
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            askLyrics = false
-                            vm.updateSettings { it.copy(lyrics = true) }
-                            vm.requestLyrics()
-                        }) { Text("Allow") }
-                    },
-                    dismissButton = { TextButton(onClick = { askLyrics = false }) { Text("Cancel") } },
-                )
-            }
-
             if (showSettings) {
                 SettingsSheet(
                     deck = deck,
@@ -812,8 +756,6 @@ fun TurntableScreen(
                     onSelectFinish = { vm.setLook(look.copy(finish = it)) },
                     onSettings = { new -> vm.updateSettings { new } },
                     onResetCrossfade = { ui.player?.let(vm::forgetCrossfade) },
-                    savedLyrics = savedLyrics,
-                    onClearLyrics = vm::clearSavedLyrics,
                     onPreviewDay = {
                         showSettings = false                                // so you can watch
                         vm.previewDay()

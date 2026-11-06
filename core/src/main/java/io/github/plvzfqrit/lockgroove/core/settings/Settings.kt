@@ -46,10 +46,6 @@ data class Settings(
     /** How fast the platter turns, degrees a second ([Scales.spin]; 30 = a turn every 12 s). */
     val spin: Float = 30f,
     val grooveGlints: Boolean = true,
-    /** Show synced lyrics (only the "withLyrics" build can). Off until the listener allows it. */
-    val lyrics: Boolean = false,
-    /** Show traditional Chinese lyrics in simplified characters. */
-    val simplifiedChinese: Boolean = false,
     /** While a player is stuck buffering, the record's label breathes. */
     val pulseLabel: Boolean = true,
     /** While a player is stuck buffering, the song title and artist breathe. */

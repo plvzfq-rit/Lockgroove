@@ -7,8 +7,6 @@ on a turntable. The needle drives the music: lift the arm and the song pauses, d
 anywhere on the record and it plays from there.
 
 No ads, no account, no internet permission. Everything stays on your phone.
-(There is an optional second build with lyrics, which does ask for the internet: see
-[Building](#building).)
 
 It's named after the locked groove: the endless loop at the very end of a record, where
 the needle goes round and round until someone lifts it.
@@ -113,27 +111,8 @@ notification sound or a paused Chrome tab doesn't steal the session"*.
 Android Studio (AGP 9), JDK 17+, min SDK 24.
 
 ```
-./gradlew :app:installStandardRelease
+./gradlew :app:installRelease
 ```
-
-There are two builds of the same app:
-
-- **standard**: the app described above. It has no internet permission at all.
-- **withLyrics**: the same app, installed beside it as a separate app (`.lyrics`), plus the
-  internet permission and one extra feature. A **Get lyrics** button appears under the
-  artist's name, in landscape. **Nothing is looked up by itself**: only when you
-  tap it for a song, and only after you allow it once. Then the song's title, artist and length
-  are sent to [lrclib.net](https://lrclib.net) to fetch synced lyrics. The lyrics you get are
-  kept on the phone (in the app's private storage, up to 500 songs) for 90 days, so a song is
-  not looked up twice in that time, and turning the phone or leaving the app doesn't ask again.
-  After 90 days the button comes back for that song and a tap fetches a fresh copy. In Settings you can turn
-  lookups off and clear the saved lyrics. Build it with `./gradlew :app:installWithLyricsRelease`.
-  Songs in Chinese, Korean, Japanese, Arabic and other scripts also get a reading in Latin
-  letters under the line (pinyin with tone marks, romaji, and so on), and traditional Chinese
-  can be shown in simplified characters (a Settings toggle). It is about 13 MB bigger than the
-  standard build, because it carries a Japanese dictionary to read kanji in context.
-
-In Android Studio, pick the one you want in the **Build Variants** panel.
 
 Release builds have R8 on and are signed with the debug key, so they install on your
 own phone. On first launch the app asks for notification access: that's how Android
@@ -156,11 +135,6 @@ and Claude wrote most of the code to match.
 - Walnut and oak: CC0 veneer scans from [Poly Haven](https://polyhaven.com)
   (*Black Walnut Veneer 02* and *Red Oak Veneer*), cropped and given an oiled finish by
   [`tools/make_wood.py`](tools/make_wood.py).
-- Lyrics (the *withLyrics* build only): synced lyrics from [LRCLIB](https://lrclib.net), a
-  free community service.
-- Japanese readings (the *withLyrics* build only): [Kuromoji](https://github.com/atilika/kuromoji)
-  by Atilika (Apache-2.0), with the IPADIC dictionary (© Nara Institute of Science and
-  Technology; its notice ships inside the library).
 - Where the sun is: the reference cities in the tz database's `zone.tab` (public domain).
 
 ## License
